@@ -1,0 +1,259 @@
+{
+  "name": "pcons",
+  "displayName": "pcons",
+  "description": "pcons support for VSCode",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.120.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "activationEvents": [
+    "workspaceContains:pcons-build.py"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "pcons.scanToolchains",
+        "title": "pcons: Scan toolchains"
+      },
+      {
+        "command": "pcons.configure",
+        "title": "pcons: Configure"
+      },
+      {
+        "command": "pcons.build",
+        "title": "pcons: Build",
+        "icon": "./res/icon-build.svg"
+      },
+      {
+        "command": "pcons.clean",
+        "title": "pcons: Clean"
+      },
+      {
+        "command": "pcons.run",
+        "title": "pcons: Run"
+      },
+      {
+        "command": "pcons.debug",
+        "title": "pcons: Debug"
+      },
+      {
+        "command": "pcons.commandDebug",
+        "title": "pcons: Debug pcons command"
+      },
+      {
+        "command": "pcons.executableArguments",
+        "title": "pcons: Executable arguments"
+      },
+      {
+        "command": "pcons.debugWithArgs",
+        "title": "pcons: Debug with args"
+      },
+      {
+        "command": "pcons.test",
+        "title": "pcons: Test"
+      },
+      {
+        "command": "pcons.selectLaunchTarget",
+        "title": "pcons: Select run/debug target"
+      },
+      {
+        "command": "pcons.selectBuildTargets",
+        "title": "pcons: Select build targets"
+      },
+      {
+        "command": "pcons.selectBuildType",
+        "title": "pcons: Select build type"
+      },
+      {
+        "command": "pcons.selectTestTargets",
+        "title": "pcons: Select test targets"
+      },
+      {
+        "command": "pcons.debugBuild",
+        "title": "pcons: Build (debug)"
+      },
+      {
+        "command": "pcons.clearDiags",
+        "title": "pcons: Clear diagnostics"
+      },
+      {
+        "command": "pcons.selectToolchain",
+        "title": "pcons: Select toolchain"
+      },
+      {
+        "command": "pcons.currentToolchain",
+        "title": "pcons: Get current toolchains"
+      }
+    ],
+    "configuration": {
+      "title": "pcons build configuration",
+      "properties": {
+        "pcons.buildFolder": {
+          "type": "string",
+          "default": "build-${toolchain}-${buildType}",
+          "description": "Specify in which folder pcons build configure and build the project."
+        },
+        "pcons.configureOptions": {
+          "type": "array",
+          "default": [],
+          "description": "Specify the list of configuration options used for pcons configuration."
+        },
+        "pcons.pythonPath": {
+          "type": "string",
+          "default": "python",
+          "description": "Specify the python executable to use"
+        },
+        "pcons.debuggerPath": {
+          "type": "string",
+          "description": "Specify the debugger executable to use",
+          "default": null
+        },
+        "pcons.jobs": {
+          "type": "integer",
+          "description": "Max parallel jobs"
+        },
+        "pcons.pythonDebugJustMyCode": {
+          "type": "boolean",
+          "default": true,
+          "description": "Use 'JustMyCode' option when debugging build scripts"
+        },
+        "pcons.settings": {
+          "type": "object",
+          "default": {},
+          "description": "Workspace build settings"
+        },
+        "pcons.options": {
+          "type": "object",
+          "default": {},
+          "description": "Workspace build options"
+        }
+      }
+    },
+    "keybindings": [
+      {
+        "key": "f7",
+        "when": "inPconsProject",
+        "command": "pcons.build"
+      },
+      {
+        "key": "ctrl+shift+f7",
+        "when": "inPconsProject",
+        "command": "pcons.debugBuild"
+      },
+      {
+        "key": "ctrl+f7",
+        "when": "inPconsProject",
+        "command": "pcons.clean"
+      },
+      {
+        "key": "f5",
+        "command": "pcons.debug",
+        "when": "!inDebugMode && inPconsProject"
+      },
+      {
+        "key": "ctrl+f5",
+        "command": "pcons.debugWithArgs",
+        "when": "!inDebugMode && inPconsProject"
+      },
+      {
+        "key": "shift+f5",
+        "command": "pcons.run",
+        "when": "!inDebugMode && inPconsProject"
+      },
+      {
+        "key": "ctrl+shift+f5",
+        "command": "pcons.commandDebug",
+        "when": "!inDebugMode && inPconsProject"
+      }
+    ],
+    "menus": {
+      "touchBar": [
+        {
+          "command": "pcons.configure",
+          "when": "inPconsProject",
+          "group": "pcons:build"
+        },
+        {
+          "command": "pcons.selectLaunchTarget",
+          "when": "inPconsProject",
+          "group": "pcons:build"
+        },
+        {
+          "command": "pcons.selectBuildTargets",
+          "when": "inPconsProject",
+          "group": "pcons:build"
+        },
+        {
+          "command": "pcons.selectBuildType",
+          "when": "inPconsProject",
+          "group": "pcons:build"
+        },
+        {
+          "command": "pcons.build",
+          "when": "inPconsProject",
+          "group": "pcons:build"
+        },
+        {
+          "command": "pcons.debugBuild",
+          "when": "inPconsProject",
+          "group": "pcons:debug"
+        },
+        {
+          "command": "pcons.run",
+          "when": "inPconsProject",
+          "group": "pcons:run"
+        },
+        {
+          "command": "pcons.debug",
+          "when": "inPconsProject",
+          "group": "pcons:run"
+        },
+        {
+          "command": "pcons.clearDiags",
+          "when": "inPconsProject",
+          "group": "pcons:utils"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "compile": "npm run check-types && npm run lint && node esbuild.js",
+    "watch": "npm-run-all -p watch:*",
+    "watch:esbuild": "node esbuild.js --watch",
+    "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
+    "package": "npm run check-types && npm run lint && node esbuild.js --production",
+    "compile-tests": "tsc -p . --outDir out",
+    "watch-tests": "tsc -p . -w --outDir out",
+    "pretest": "npm run compile-tests && npm run compile && npm run lint",
+    "check-types": "tsc --noEmit",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "dependencies": {
+    "vscode-cpptools": "^5.0.0",
+    "vscode-test-adapter-api": "^1.9.0",
+    "vscode-test-adapter-util": "^0.7.1"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "@types/node": "22.x",
+    "@types/shell-quote": "^1.7.3",
+    "@types/vscode": "^1.120.0",
+    "@vscode/test-cli": "^0.0.11",
+    "@vscode/test-electron": "^2.5.2",
+    "esbuild": "^0.27.3",
+    "eslint": "^9.39.3",
+    "npm-run-all": "^4.1.5",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.56.1"
+  },
+  "extensionDependencies": [
+    "hbenl.vscode-test-explorer",
+    "ms-vscode.cpptools"
+  ]
+}
