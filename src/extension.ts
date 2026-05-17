@@ -84,6 +84,9 @@ export class Pcons implements vscode.Disposable {
 	}
 
 	loadWorkspaceState() {
+		const advancedCodeLens = this.extensionContext.workspaceState.get<boolean>('advancedCodeLens', false);
+		this._codeLensProvider.setAdvancedMode(advancedCodeLens);
+
 		this.tests = this.extensionContext.workspaceState.get<string[]>('selectedTests') ?? [];
 		this.testsChanged.fire(this.tests);
 		this.testsChanged.event((value: string[]) => {
@@ -226,6 +229,23 @@ export class Pcons implements vscode.Disposable {
 		await commands.run(this);
 	}
 
+	async runTargetWithArgs(name: string) {
+		await this.ensureConfigured();
+		await this.ensureTargetsLoaded();
+		const target = this.findTarget(name);
+		if (target === undefined) {
+			throw new Error(`Target not found: ${name}`);
+		}
+		if (!target.executable) {
+			throw new Error(`Target is not executable: ${name}`);
+		}
+		this.launchTarget = target;
+		this.launchTargetChanged.fire(this.launchTarget);
+		await this.executableArguments(target.fullname);
+		const args = this.makeArgumentList(this.launchTargetArguments[target.fullname] ?? "");
+		await commands.run(this, args);
+	}
+
 	async debugTarget(name: string) {
 		await this.ensureConfigured();
 		await this.ensureTargetsLoaded();
@@ -241,6 +261,24 @@ export class Pcons implements vscode.Disposable {
 		await commands.build(this, [target]);
 		const args = this.makeArgumentList(this.launchTargetArguments[this.launchTarget.fullname] ?? "");
 		await debuggerModule.debug(this.launchTarget, args);
+	}
+
+	async debugTargetWithArgs(name: string) {
+		await this.ensureConfigured();
+		await this.ensureTargetsLoaded();
+		const target = this.findTarget(name);
+		if (target === undefined) {
+			throw new Error(`Target not found: ${name}`);
+		}
+		if (!target.executable) {
+			throw new Error(`Target is not executable: ${name}`);
+		}
+		this.launchTarget = target;
+		this.launchTargetChanged.fire(this.launchTarget);
+		await this.executableArguments(target.fullname);
+		await commands.build(this, [target]);
+		const args = this.makeArgumentList(this.launchTargetArguments[target.fullname] ?? "");
+		await debuggerModule.debug(target, args);
 	}
 
 	async invalidateConfig() {
@@ -499,7 +537,16 @@ export class Pcons implements vscode.Disposable {
 		register('commandDebug', async () => this.commandDebug());
 		register('buildTarget', async (name: string) => this.buildTarget(name));
 		register('runTarget', async (name: string) => this.runTarget(name));
+		register('runTargetWithArgs', async (name: string) => this.runTargetWithArgs(name));
 		register('debugTarget', async (name: string) => this.debugTarget(name));
+		register('debugTargetWithArgs', async (name: string) => this.debugTargetWithArgs(name));
+		register('toggleAdvancedCodeLensMode', async () => {
+			this._codeLensProvider.toggleAdvancedMode();
+			await this.extensionContext.workspaceState.update(
+				'advancedCodeLens',
+				this._codeLensProvider.isAdvancedMode()
+			);
+		});
 	}
 
 	async initTestExplorer() {

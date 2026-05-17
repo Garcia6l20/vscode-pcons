@@ -90,6 +90,10 @@
       {
         "command": "pcons.debugTarget",
         "title": "pcons: Debug Target"
+      },
+      {
+        "command": "pcons.toggleAdvancedCodeLensMode",
+        "title": "pcons: Toggle Advanced CodeLens Mode"
       }
     ],
     "configuration": {
@@ -166,6 +170,11 @@
         "key": "ctrl+shift+f5",
         "command": "pcons.commandDebug",
         "when": "!inDebugMode && inPconsProject"
+      },
+      {
+        "command": "pcons.toggleAdvancedCodeLensMode",
+        "key": "ctrl+alt+a",
+        "when": "editorTextFocus && inPconsProject"
       }
     ],
     "menus": {

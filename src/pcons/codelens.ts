@@ -5,6 +5,7 @@ import { readMetadata } from "./metadata";
 
 export class PconsCodeLensProvider implements vscode.CodeLensProvider, vscode.Disposable {
     private readonly changeEmitter = new vscode.EventEmitter<void>();
+    private advancedMode = false;
     readonly onDidChangeCodeLenses = this.changeEmitter.event;
 
     constructor(private readonly ext: Pcons) {
@@ -12,6 +13,28 @@ export class PconsCodeLensProvider implements vscode.CodeLensProvider, vscode.Di
 
     refresh(): void {
         this.changeEmitter.fire();
+    }
+
+    toggleAdvancedMode(): void {
+        this.advancedMode = !this.advancedMode;
+        vscode.window.setStatusBarMessage(
+            this.advancedMode
+                ? "Pcons: Advanced CodeLens enabled"
+                : "Pcons: Advanced CodeLens disabled",
+            2000
+        );
+        this.refresh();
+    }
+
+    setAdvancedMode(enabled: boolean): void {
+        if (this.advancedMode !== enabled) {
+            this.advancedMode = enabled;
+            this.refresh();
+        }
+    }
+
+    isAdvancedMode(): boolean {
+        return this.advancedMode;
     }
 
     dispose(): void {
@@ -56,11 +79,28 @@ export class PconsCodeLensProvider implements vscode.CodeLensProvider, vscode.Di
                     command: "pcons.runTarget",
                     arguments: [targetSelector],
                 }));
+
+                if (this.advancedMode) {
+                    lenses.push(new vscode.CodeLens(range, {
+                        title: "Run with args",
+                        command: "pcons.runTargetWithArgs",
+                        arguments: [targetSelector],
+                    }));
+                }
+
                 lenses.push(new vscode.CodeLens(range, {
                     title: "Debug",
                     command: "pcons.debugTarget",
                     arguments: [targetSelector],
                 }));
+
+                if (this.advancedMode) {
+                    lenses.push(new vscode.CodeLens(range, {
+                        title: "Debug with args",
+                        command: "pcons.debugTargetWithArgs",
+                        arguments: [targetSelector],
+                    }));
+                }
             }
         }
 
