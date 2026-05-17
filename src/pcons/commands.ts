@@ -54,7 +54,9 @@ export async function getTargets(ext: pcons): Promise<Target[]> {
         throw new Error(`pcons metadata not found in ${ext.buildPath}`);
     }
 
-    const targets = metadata.targets.map((target) => metadataTargetToTarget(target, ext.projectRoot));
+    const targets = metadata.targets.map((target) =>
+        metadataTargetToTarget(target, ext.projectRoot, metadata.project.build_dir)
+    );
     const targetNames = new Set(targets.map((target) => target.fullname));
     const aliases = metadata.aliases
         .filter((alias) => !targetNames.has(alias.name))
@@ -63,9 +65,16 @@ export async function getTargets(ext: pcons): Promise<Target[]> {
     return [...targets, ...aliases];
 }
 
-function metadataTargetToTarget(target: PconsMetadataTarget, projectRoot: string): Target {
-    const output = target.outputs.length > 0
-        ? path.resolve(projectRoot, target.outputs[0])
+function metadataTargetToTarget(
+    target: PconsMetadataTarget,
+    projectRoot: string,
+    buildDir: string
+): Target {
+    const mainOutput = pickMainOutput(target);
+    const buildTargetName = stripBuildDirPrefix(mainOutput, buildDir);
+
+    const output = mainOutput.length > 0
+        ? path.resolve(projectRoot, mainOutput)
         : "";
 
     const sourcePath = target.sources.length > 0
@@ -78,13 +87,58 @@ function metadataTargetToTarget(target: PconsMetadataTarget, projectRoot: string
 
     return {
         name: target.name,
-        fullname: target.name,
+        // Build commands need the concrete build target identifier used in
+        // build.ninja (often the first output path in subdir layouts).
+        fullname: buildTargetName.length > 0 ? buildTargetName : target.name,
         output: output,
         srcPath: sourcePath,
         buildPath: buildPath,
-        executable: target.type === "program",
+        executable: target.type === "program" && mainOutput.length > 0,
         type: target.type,
     };
+}
+
+function pickMainOutput(target: PconsMetadataTarget): string {
+    if (target.outputs.length === 0) {
+        return "";
+    }
+
+    if (target.type !== "program") {
+        return target.outputs[0];
+    }
+
+    // Prefer the real executable when extra linker artifacts are present.
+    const executableCandidate = target.outputs.find((output) => {
+        const name = output.toLowerCase();
+        return !name.endsWith(".pdb")
+            && !name.endsWith(".ilk")
+            && !name.endsWith(".exp")
+            && !name.endsWith(".lib")
+            && !name.endsWith(".dylib")
+            && !name.endsWith(".so")
+            && !name.endsWith(".a");
+    });
+
+    return executableCandidate ?? target.outputs[0];
+}
+
+function stripBuildDirPrefix(outputPath: string, buildDir: string): string {
+    const normalizedOutput = outputPath.replace(/\\/g, "/").replace(/^\.\//, "");
+    const normalizedBuildDir = buildDir
+        .replace(/\\/g, "/")
+        .replace(/^\.\//, "")
+        .replace(/\/+$/, "");
+
+    if (normalizedBuildDir.length === 0 || normalizedBuildDir === ".") {
+        return normalizedOutput;
+    }
+
+    const prefix = `${normalizedBuildDir}/`;
+    if (normalizedOutput.startsWith(prefix)) {
+        return normalizedOutput.substring(prefix.length);
+    }
+
+    return normalizedOutput;
 }
 
 function metadataAliasToTarget(alias: PconsMetadataAlias, projectRoot: string): Target {
