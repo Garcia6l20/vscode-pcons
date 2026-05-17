@@ -226,25 +226,25 @@ class SelectTestTargetsButton extends Button {
     }
 }
 
-class SelectToolchainButton extends Button {
-    constructor(ext: pcons, protected readonly priority: number) {
-        super(priority);
-        this.command = 'pcons.selectToolchain';
-        this.text = 'none';
-        this.tooltip = 'Select toolchain';
-        ext.currentToolchainChanged.event((toolchain: string|undefined) => {
-            this.text = toolchain??'none';
-            this.update();
-        });
-    }
-}
+// class SelectToolchainButton extends Button {
+//     constructor(ext: pcons, protected readonly priority: number) {
+//         super(priority);
+//         this.command = 'pcons.selectToolchain';
+//         this.text = 'none';
+//         this.tooltip = 'Select toolchain';
+//         ext.currentToolchainChanged.event((toolchain: string|undefined) => {
+//             this.text = toolchain??'none';
+//             this.update();
+//         });
+//     }
+// }
 
 export class StatusBar implements vscode.Disposable {
 
   private readonly _buttons: Button[];
   constructor(ext: pcons) {
     this._buttons = [
-        new SelectToolchainButton(ext, 1),
+        // new SelectToolchainButton(ext, 1),
         new SelectBuildTypeButton(ext, 0.95),
         new SelectLaunchTargetButton(ext, 0.9),
         new DebugButton(ext, 0.8),

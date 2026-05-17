@@ -45,7 +45,6 @@ export interface CppDebugConfiguration {
     args?: string[];
     cwd?: string;
     environment?: DebuggerEnvironmentVariable[];
-    // eslint-disable-next-line @typescript-eslint/naming-convention
     MIMode?: MIModes;
     miDebuggerPath?: string;
     stopAtEntry?: boolean;
@@ -90,7 +89,6 @@ async function createGDBDebugConfiguration(debuggerPath: string, target: Target)
         cwd: target.buildPath,
         environment: createDebuggerEnv(debuggerPath, target),
         args: [],
-        // eslint-disable-next-line @typescript-eslint/naming-convention
         MIMode: MIModes.gdb,
         miDebuggerPath: debuggerPath,
         setupCommands: [
@@ -112,7 +110,6 @@ async function createLLDBDebugConfiguration(debuggerPath: string, target: Target
         cwd: target.buildPath,
         environment: createDebuggerEnv(debuggerPath, target),
         args: [],
-        // eslint-disable-next-line @typescript-eslint/naming-convention
         MIMode: MIModes.lldb,
         miDebuggerPath: debuggerPath,
         program: target.output,

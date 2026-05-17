@@ -1,13 +1,15 @@
 import * as vscode from "vscode";
-import { channelExec, handleDiagnostics, Stream, getLogArgs } from "./run";
+import * as path from "path";
+import { channelExec, execInTerminal, handleDiagnostics, Stream, getLogArgs } from "./run";
 import { pcons } from "../extension";
 import { isTarget, Target } from "./targets";
 import { TestSuiteInfo, TestInfo } from "./testAdapter";
 import { DebuggerEnvironmentVariable } from "./debugger";
+import { PconsMetadataAlias, PconsMetadataTarget, readMetadata } from "./metadata";
 
-export async function scanToolchains(ext: pcons) {
-    return channelExec('scan-toolchains', getLogArgs());
-}
+// export async function scanToolchains(ext: pcons) {
+//     return channelExec('scan-toolchains', getLogArgs());
+// }
 
 const pconsBaseArgs = ['-u', '-m', 'pcons'];
 const codeInterfaceArgs = [...pconsBaseArgs, 'code'];
@@ -16,7 +18,6 @@ export async function codeCommand<T>(ext: pcons, fn: string, ...args: string[]):
     let stream = new Stream('python', [...codeInterfaceArgs, fn, ...args], {
         env: {
             ...process.env,
-            // eslint-disable-next-line @typescript-eslint/naming-convention
             'pcons_BUILD_PATH': ext.buildPath,
         },
         cwd: ext.projectRoot,
@@ -48,7 +49,54 @@ export async function getToolchains(ext: pcons): Promise<string[]> {
 }
 
 export async function getTargets(ext: pcons): Promise<Target[]> {
-    return codeCommand<Target[]>(ext, 'get-targets');
+    const metadata = await readMetadata(ext.buildPath);
+    if (metadata === undefined) {
+        throw new Error(`pcons metadata not found in ${ext.buildPath}`);
+    }
+
+    const targets = metadata.targets.map((target) => metadataTargetToTarget(target, ext.projectRoot));
+    const targetNames = new Set(targets.map((target) => target.fullname));
+    const aliases = metadata.aliases
+        .filter((alias) => !targetNames.has(alias.name))
+        .map((alias) => metadataAliasToTarget(alias, ext.projectRoot));
+
+    return [...targets, ...aliases];
+}
+
+function metadataTargetToTarget(target: PconsMetadataTarget, projectRoot: string): Target {
+    const output = target.outputs.length > 0
+        ? path.resolve(projectRoot, target.outputs[0])
+        : "";
+
+    const sourcePath = target.sources.length > 0
+        ? path.resolve(projectRoot, path.dirname(target.sources[0]))
+        : projectRoot;
+
+    const buildPath = output.length > 0
+        ? path.dirname(output)
+        : projectRoot;
+
+    return {
+        name: target.name,
+        fullname: target.name,
+        output: output,
+        srcPath: sourcePath,
+        buildPath: buildPath,
+        executable: target.type === "program",
+        type: target.type,
+    };
+}
+
+function metadataAliasToTarget(alias: PconsMetadataAlias, projectRoot: string): Target {
+    return {
+        name: alias.name,
+        fullname: alias.name,
+        output: "",
+        srcPath: projectRoot,
+        buildPath: projectRoot,
+        executable: false,
+        type: "alias",
+    };
 }
 
 
@@ -60,28 +108,30 @@ export async function getTestSuites(ext: pcons): Promise<TestSuiteInfo> {
     return codeCommand<TestSuiteInfo>(ext, 'get-test-suites');
 }
 
-export async function configure(ext: pcons) {
-    const toolchain = await ext.currentToolchain();
-    if (toolchain === undefined) {
-        return;
-    }
-    let args = ['-B', ext.buildPath, '-S', ext.projectRoot];
-    const settings = ext.getConfig<Object>('settings');
-    if (settings !== undefined) {
-        for (const [key, value] of Object.entries(settings)) {
-            args.push('-s', `${key}=${value}`);
-        }
-    }
-    args.push('-s', `build_type=${ext.buildType}`);
-    const options = ext.getConfig<Object>('options');
-    if (options !== undefined) {
-        for (const [key, value] of Object.entries(options)) {
-            args.push('-o', `${key}=${value}`);
+export async function generate(ext: pcons) {
+    // const toolchain = await ext.currentToolchain();
+    // if (toolchain === undefined) {
+    //     return;
+    // }
+    let args = ['-B', ext.buildPath, '-b', `${ext.projectRoot}/pcons-build.py`];
+    const variables = ext.getConfig<Object>('variables');
+    if (variables !== undefined) {
+        for (const [key, value] of Object.entries(variables)) {
+            args.push(`${key}=${value}`);
         }
     }
     args.push(...getLogArgs());
-    args.push('--toolchain', toolchain);
-    return channelExec('configure', args, undefined, true, ext.projectRoot);
+    // args.push('--toolchain', toolchain);
+    await channelExec('generate', args, undefined, true, ext.projectRoot);
+
+    const metadataArgs = [...args, '-G', 'metadata'];
+    await channelExec(
+        'generate',
+        metadataArgs,
+        'Generating pcons metadata',
+        true,
+        ext.projectRoot
+    );
 }
 
 function baseArgs(ext: pcons): string[] {
@@ -119,7 +169,7 @@ export async function build(ext: pcons, targets: Target[] | string[] = [], debug
     if (debug) {
         await debugExec(ext, ['build', ...args]);
     } else {
-        await channelExec('code', ['build', ...args], undefined, true, ext.projectRoot, ext.buildDiagnostics);
+        await channelExec('build', [...args], undefined, true, ext.projectRoot, ext.buildDiagnostics);
     }
 }
 
@@ -141,14 +191,22 @@ export async function clean(ext: pcons) {
 }
 
 export async function run(ext: pcons, args?: string[]) {
-    let cmdArgs = baseArgs(ext);
-    if (ext.launchTarget) {
-        cmdArgs.push(ext.launchTarget.fullname);
+    const target = ext.launchTarget;
+    if (!target || !target.executable) {
+        throw new Error('No executable launch target selected');
     }
-    if (args) {
-        cmdArgs.push(...args);
-    }
-    return channelExec('run', cmdArgs, undefined, true, ext.projectRoot);
+
+    const targetDirectory = target.output.length > 0
+        ? path.dirname(target.output)
+        : target.buildPath || ext.projectRoot;
+
+    execInTerminal(
+        target.output,
+        args ?? [],
+        targetDirectory,
+        target.env,
+        `pcons: ${target.name}`
+    );
 }
 
 export async function test(ext: pcons) {

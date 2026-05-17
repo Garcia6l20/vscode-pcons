@@ -16,21 +16,16 @@
   "contributes": {
     "commands": [
       {
-        "command": "pcons.scanToolchains",
-        "title": "pcons: Scan toolchains"
-      },
-      {
         "command": "pcons.configure",
         "title": "pcons: Configure"
       },
       {
-        "command": "pcons.build",
-        "title": "pcons: Build",
-        "icon": "./res/icon-build.svg"
+        "command": "pcons.generate",
+        "title": "pcons: Generate"
       },
       {
-        "command": "pcons.clean",
-        "title": "pcons: Clean"
+        "command": "pcons.build",
+        "title": "pcons: Build"
       },
       {
         "command": "pcons.run",
@@ -41,16 +36,12 @@
         "title": "pcons: Debug"
       },
       {
-        "command": "pcons.commandDebug",
-        "title": "pcons: Debug pcons command"
+        "command": "pcons.debugBuild",
+        "title": "pcons: Debug Build"
       },
       {
-        "command": "pcons.executableArguments",
-        "title": "pcons: Executable arguments"
-      },
-      {
-        "command": "pcons.debugWithArgs",
-        "title": "pcons: Debug with args"
+        "command": "pcons.clean",
+        "title": "pcons: Clean"
       },
       {
         "command": "pcons.test",
@@ -58,35 +49,35 @@
       },
       {
         "command": "pcons.selectLaunchTarget",
-        "title": "pcons: Select run/debug target"
+        "title": "pcons: Select Launch Target"
       },
       {
         "command": "pcons.selectBuildTargets",
-        "title": "pcons: Select build targets"
+        "title": "pcons: Select Build Targets"
       },
       {
         "command": "pcons.selectBuildType",
-        "title": "pcons: Select build type"
+        "title": "pcons: Select Build Type"
       },
       {
         "command": "pcons.selectTestTargets",
-        "title": "pcons: Select test targets"
+        "title": "pcons: Select Test Targets"
       },
       {
-        "command": "pcons.debugBuild",
-        "title": "pcons: Build (debug)"
+        "command": "pcons.executableArguments",
+        "title": "pcons: Set Executable Arguments"
+      },
+      {
+        "command": "pcons.debugWithArgs",
+        "title": "pcons: Debug With Arguments"
+      },
+      {
+        "command": "pcons.commandDebug",
+        "title": "pcons: Debug pcons Command"
       },
       {
         "command": "pcons.clearDiags",
-        "title": "pcons: Clear diagnostics"
-      },
-      {
-        "command": "pcons.selectToolchain",
-        "title": "pcons: Select toolchain"
-      },
-      {
-        "command": "pcons.currentToolchain",
-        "title": "pcons: Get current toolchains"
+        "title": "pcons: Clear Diagnostics"
       }
     ],
     "configuration": {
@@ -94,13 +85,8 @@
       "properties": {
         "pcons.buildFolder": {
           "type": "string",
-          "default": "build-${toolchain}-${buildType}",
+          "default": "build",
           "description": "Specify in which folder pcons build configure and build the project."
-        },
-        "pcons.configureOptions": {
-          "type": "array",
-          "default": [],
-          "description": "Specify the list of configuration options used for pcons configuration."
         },
         "pcons.pythonPath": {
           "type": "string",
@@ -121,15 +107,15 @@
           "default": true,
           "description": "Use 'JustMyCode' option when debugging build scripts"
         },
-        "pcons.settings": {
-          "type": "object",
-          "default": {},
-          "description": "Workspace build settings"
+        "pcons.variants": {
+          "type": "array",
+          "default": [],
+          "description": "Workspace variants to build"
         },
-        "pcons.options": {
+        "pcons.variables": {
           "type": "object",
           "default": {},
-          "description": "Workspace build options"
+          "description": "Workspace build variables"
         }
       }
     },

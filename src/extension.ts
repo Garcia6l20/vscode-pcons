@@ -58,7 +58,7 @@ export class pcons implements vscode.Disposable {
 	buildTargetsChanged = new vscode.EventEmitter<Target[]>();
 	tests: string[] = [];
 	testsChanged = new vscode.EventEmitter<string[]>();
-	currentToolchainChanged = new vscode.EventEmitter<string | undefined>();
+	// currentToolchainChanged = new vscode.EventEmitter<string | undefined>();
 	buildDiagnostics: vscode.DiagnosticCollection;
 
 	private readonly _statusBar = new StatusBar(this);
@@ -80,11 +80,11 @@ export class pcons implements vscode.Disposable {
 	}
 
 	loadWorkspaceState() {
-		this._toolchain = this.extensionContext.workspaceState.get('currentToolchain');
-		this.currentToolchainChanged.fire(this._toolchain);
-		this.currentToolchainChanged.event((value: string | undefined) => {
-			this.extensionContext.workspaceState.update('currentToolchain', value);
-		});
+		// this._toolchain = this.extensionContext.workspaceState.get('currentToolchain');
+		// this.currentToolchainChanged.fire(this._toolchain);
+		// this.currentToolchainChanged.event((value: string | undefined) => {
+		// 	this.extensionContext.workspaceState.update('currentToolchain', value);
+		// });
 
 		this.tests = this.extensionContext.workspaceState.get<string[]>('selectedTests') ?? [];
 		this.testsChanged.fire(this.tests);
@@ -126,7 +126,7 @@ export class pcons implements vscode.Disposable {
 		const p = this.projectRoot + '/' + (this.getConfig<string>('buildFolder') ?? 'build');
 		return p//
 			.replace('${workspaceFolder}', this.workspaceFolder.uri.fsPath)//
-			.replace('${toolchain}', this._toolchain ?? 'default')//
+			// .replace('${toolchain}', this._toolchain ?? 'default')//
 			.replace('${buildType}', this.buildType ?? 'debug');
 	}
 
@@ -152,6 +152,32 @@ export class pcons implements vscode.Disposable {
 	async cleanup() {
 	}
 
+	private sameTarget(a: Target, b: Target) {
+		return a.fullname === b.fullname;
+	}
+
+	async refreshTargets() {
+		this.targets = await commands.getTargets(this);
+
+		const executableTargets = this.targets.filter((target) => target.executable);
+		const launchStillValid = this.launchTarget !== undefined
+			&& executableTargets.some((target) => this.sameTarget(target, this.launchTarget!));
+		if (!launchStillValid) {
+			this.launchTarget = executableTargets[0];
+			this.launchTargetChanged.fire(this.launchTarget);
+		}
+
+		if (this.buildTargets.length > 0) {
+			const validBuildTargets = this.buildTargets.filter((buildTarget) =>
+				this.targets.some((target) => this.sameTarget(target, buildTarget))
+			);
+			if (validBuildTargets.length !== this.buildTargets.length) {
+				this.buildTargets = validBuildTargets;
+				this.buildTargetsChanged.fire(this.buildTargets);
+			}
+		}
+	}
+
 	async invalidateConfig() {
 		this.targets = [];
 		this.launchTarget = undefined;
@@ -168,7 +194,7 @@ export class pcons implements vscode.Disposable {
 		if (type) {
 			this._buildType = type;
 			this.buildTypeChanged.fire(this.buildType);
-			await this.configure();
+			await this.generate();
 			await this.invalidateConfig();
 		}
 		return this.buildType;
@@ -242,13 +268,13 @@ export class pcons implements vscode.Disposable {
 		return this.tests;
 	}
 
-	private _toolchain: string | undefined = undefined;
-	async selectToolchain() {
-		const toolchains = await commands.getToolchains(this);
-		this._toolchain = await vscode.window.showQuickPick(['default', ...toolchains]) ?? 'default';
-		this.currentToolchainChanged.fire(this._toolchain);
-		await this.configure();
-	}
+	// private _toolchain: string | undefined = undefined;
+	// async selectToolchain() {
+	// 	const toolchains = await commands.getToolchains(this);
+	// 	this._toolchain = await vscode.window.showQuickPick(['default', ...toolchains]) ?? 'default';
+	// 	this.currentToolchainChanged.fire(this._toolchain);
+	// 	await this.generate();
+	// }
 
 	private _config: pconsConfig | undefined = undefined;
 	get config(): pconsConfig | undefined {
@@ -258,8 +284,8 @@ export class pcons implements vscode.Disposable {
 				try {
 					const data = readFileSync(configPath, 'utf8');
 					this._config = JSON.parse(data) as pconsConfig;
-					this._toolchain = this._config.toolchain;
-					this.currentToolchainChanged.fire(this._toolchain);
+					// this._toolchain = this._config.toolchain;
+					// this.currentToolchainChanged.fire(this._toolchain);
 				} catch (err) {
 					console.error(err);
 				}
@@ -268,57 +294,57 @@ export class pcons implements vscode.Disposable {
 		return this._config;
 	}
 
-	async currentToolchain() {
-		if (this._toolchain === undefined) {
-			if (this.config) {
-				this.config.toolchain;
-			} else {
-				await this.selectToolchain();
-			}
-		}
-		return this._toolchain;
-	}
+	// async currentToolchain() {
+	// 	if (this._toolchain === undefined) {
+	// 		if (this.config) {
+	// 			this.config.toolchain;
+	// 		} else {
+	// 			await this.selectToolchain();
+	// 		}
+	// 	}
+	// 	return this._toolchain;
+	// }
 
-	private _toolchainsConfig: any | undefined = undefined;
-	async toolchainConfig() {
-		const toolchain = await this.currentToolchain();
-		if (!toolchain) {
-			return undefined;
-		}
-		if (this._toolchainsConfig === undefined) {
-			const configPath = path.join(os.homedir(), '.pcons', 'toolchains.json');
-			if (existsSync(configPath)) {
-				try {
-					const data = readFileSync(configPath, 'utf8');
-					this._toolchainsConfig = JSON.parse(data)['toolchains'];
-				} catch (err) {
-					console.error(err);
-					return undefined;
-				}
-			} else {
-				return undefined;
-			}
-		}
-		if (!this._toolchainsConfig) {
-			return undefined;
-		}
-		return this._toolchainsConfig[toolchain];
-	}
+	// private _toolchainsConfig: any | undefined = undefined;
+	// async toolchainConfig() {
+	// 	const toolchain = await this.currentToolchain();
+	// 	if (!toolchain) {
+	// 		return undefined;
+	// 	}
+	// 	if (this._toolchainsConfig === undefined) {
+	// 		const configPath = path.join(os.homedir(), '.pcons', 'toolchains.json');
+	// 		if (existsSync(configPath)) {
+	// 			try {
+	// 				const data = readFileSync(configPath, 'utf8');
+	// 				this._toolchainsConfig = JSON.parse(data)['toolchains'];
+	// 			} catch (err) {
+	// 				console.error(err);
+	// 				return undefined;
+	// 			}
+	// 		} else {
+	// 			return undefined;
+	// 		}
+	// 	}
+	// 	if (!this._toolchainsConfig) {
+	// 		return undefined;
+	// 	}
+	// 	return this._toolchainsConfig[toolchain];
+	// }
 
 	async debuggerPath() {
 		const debuggerPath = this.getConfig<string>('debuggerPath');
 		if (debuggerPath) {
 			return debuggerPath;
 		}
-		const config = await this.toolchainConfig();
-		if (config !== undefined && 'dbg' in config) {
-			return config['dbg'];
-		}
+		// const config = await this.toolchainConfig();
+		// if (config !== undefined && 'dbg' in config) {
+		// 	return config['dbg'];
+		// }
 	}
 
 	async ensureConfigured() {
 		if (!this.config) {
-			await this.configure();
+			await this.generate();
 		}
 	}
 
@@ -329,15 +355,17 @@ export class pcons implements vscode.Disposable {
 		}
 	}
 
-	async configure() {
+	async generate() {
 		this._config = undefined;
-		await commands.configure(this);
+		await commands.generate(this);
+		await this.refreshTargets();
 		this.notifyUpdated();
 
-		this.extensionContext.environmentVariableCollection.replace('pcons_BUILD_PATH', this.buildPath);
-		if (this._toolchain !== undefined) {
-			this.extensionContext.environmentVariableCollection.replace('pcons_TOOLCHAIN', this._toolchain);
-		}
+		this.extensionContext.environmentVariableCollection.replace('PCONS_BUILD_DIR', this.buildPath);
+		this.extensionContext.environmentVariableCollection.replace('PCONS_SOURCE_DIR', this.projectRoot);
+		// if (this._toolchain !== undefined) {
+		// 	this.extensionContext.environmentVariableCollection.replace('PCONS_TOOLCHAIN', this._toolchain);
+		// }
 	}
 
 	async build(debug = false) {
@@ -440,8 +468,8 @@ export class pcons implements vscode.Disposable {
 			);
 		};
 
-		register('scanToolchains', async () => commands.scanToolchains(this));
-		register('configure', async () => this.configure());
+		// register('scanToolchains', async () => commands.scanToolchains(this));
+		register('configure', async () => this.generate());
 		register('build', async () => this.build());
 		register('debugBuild', async () => this.build(true));
 		register('clean', async () => this.clean());
@@ -455,8 +483,8 @@ export class pcons implements vscode.Disposable {
 		register('selectBuildTargets', async () => this.promptBuildTargets());
 		register('selectBuildType', async () => this.promptBuildType());
 		register('selectTestTargets', async () => this.promptTests());
-		register('selectToolchain', async () => this.selectToolchain());
-		register('currentToolchain', async () => this.currentToolchain());
+		// register('selectToolchain', async () => this.selectToolchain());
+		// register('currentToolchain', async () => this.currentToolchain());
 		register('executableArguments', async () => this.executableArguments());
 		register('debugWithArgs', async () => this.debugWithArgs());
 		register('commandDebug', async () => this.commandDebug());
@@ -519,15 +547,14 @@ export class pcons implements vscode.Disposable {
 
 		this.loadWorkspaceState();
 
-		await this.configure();
 		try {
-			this.targets = await commands.getTargets(this);
+			await this.generate();
 		} catch (e: any) {
 			vscode.window.showErrorMessage(e.toString());
 		}
 
-		await this.initCppTools();
-		await this.initTestExplorer();
+		// await this.initCppTools();
+		// await this.initTestExplorer();
 	}
 };
 

@@ -6,6 +6,18 @@ export function str2cmdline(str: string, env?: { readonly [key: string]: string 
     return sq.parse(str, env).map((e) => e.toString());
 };
 
+function quoteShellArg(arg: string): string {
+    if (arg.length === 0) {
+        return "''";
+    }
+
+    if (/^[A-Za-z0-9_@%+=:,./-]+$/.test(arg)) {
+        return arg;
+    }
+
+    return `'${arg.replace(/'/g, `'\\''`)}'`;
+}
+
 function processBuffer(data: any, isError: boolean, fn: (line: string, isError: boolean) => void) {
     for (let line of data.toString().split(/\r?\n|\r/)) {
         line = line.trim();
@@ -280,6 +292,23 @@ function getTerminal(): vscode.Terminal {
     }
     terminal.show();
     return terminal;
+}
+
+export function execInTerminal(
+    command: string,
+    args: string[] = [],
+    cwd: string | undefined = undefined,
+    env: { [key: string]: string } | undefined = undefined,
+    name: string = 'pcons'
+) {
+    const terminal = vscode.window.createTerminal({
+        name,
+        cwd,
+        env,
+    });
+
+    terminal.show();
+    terminal.sendText([command, ...args].map(quoteShellArg).join(' '), true);
 }
 
 
