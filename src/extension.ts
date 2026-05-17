@@ -11,8 +11,6 @@ import { StatusBar } from './status';
 import { pconsTestAdapter } from './pcons/testAdapter';
 import { TestHub, testExplorerExtensionId } from 'vscode-test-adapter-api';
 import { Log, TestAdapterRegistrar } from 'vscode-test-adapter-util';
-import { CppToolsApi, Version, getCppToolsApi } from 'vscode-cpptools';
-import { ConfigurationProvider as CppToolsConfigurationProvider } from './cpptools';
 import { existsSync, readFileSync } from 'fs';
 import { str2cmdline } from './pcons/run';
 
@@ -59,7 +57,6 @@ export class pcons implements vscode.Disposable {
 	buildTargetsChanged = new vscode.EventEmitter<Target[]>();
 	tests: string[] = [];
 	testsChanged = new vscode.EventEmitter<string[]>();
-	// currentToolchainChanged = new vscode.EventEmitter<string | undefined>();
 	buildDiagnostics: vscode.DiagnosticCollection;
     private readonly _codeLensProvider: PconsCodeLensProvider;
 
@@ -88,12 +85,6 @@ export class pcons implements vscode.Disposable {
 	}
 
 	loadWorkspaceState() {
-		// this._toolchain = this.extensionContext.workspaceState.get('currentToolchain');
-		// this.currentToolchainChanged.fire(this._toolchain);
-		// this.currentToolchainChanged.event((value: string | undefined) => {
-		// 	this.extensionContext.workspaceState.update('currentToolchain', value);
-		// });
-
 		this.tests = this.extensionContext.workspaceState.get<string[]>('selectedTests') ?? [];
 		this.testsChanged.fire(this.tests);
 		this.testsChanged.event((value: string[]) => {
@@ -134,7 +125,7 @@ export class pcons implements vscode.Disposable {
 		const p = this.projectRoot + '/' + (this.getConfig<string>('buildFolder') ?? 'build');
 		return p//
 			.replace('${workspaceFolder}', this.workspaceFolder.uri.fsPath)//
-			// .replace('${toolchain}', this._toolchain ?? 'default')//
+			// Toolchain variable removed
 			.replace('${buildType}', this.buildType ?? 'debug');
 	}
 
@@ -343,14 +334,6 @@ export class pcons implements vscode.Disposable {
 		return this.tests;
 	}
 
-	// private _toolchain: string | undefined = undefined;
-	// async selectToolchain() {
-	// 	const toolchains = await commands.getToolchains(this);
-	// 	this._toolchain = await vscode.window.showQuickPick(['default', ...toolchains]) ?? 'default';
-	// 	this.currentToolchainChanged.fire(this._toolchain);
-	// 	await this.generate();
-	// }
-
 	private _config: pconsConfig | undefined = undefined;
 	get config(): pconsConfig | undefined {
 		if (this._config === undefined) {
@@ -359,8 +342,6 @@ export class pcons implements vscode.Disposable {
 				try {
 					const data = readFileSync(configPath, 'utf8');
 					this._config = JSON.parse(data) as pconsConfig;
-					// this._toolchain = this._config.toolchain;
-					// this.currentToolchainChanged.fire(this._toolchain);
 				} catch (err) {
 					console.error(err);
 				}
@@ -369,52 +350,12 @@ export class pcons implements vscode.Disposable {
 		return this._config;
 	}
 
-	// async currentToolchain() {
-	// 	if (this._toolchain === undefined) {
-	// 		if (this.config) {
-	// 			this.config.toolchain;
-	// 		} else {
-	// 			await this.selectToolchain();
-	// 		}
-	// 	}
-	// 	return this._toolchain;
-	// }
-
-	// private _toolchainsConfig: any | undefined = undefined;
-	// async toolchainConfig() {
-	// 	const toolchain = await this.currentToolchain();
-	// 	if (!toolchain) {
-	// 		return undefined;
-	// 	}
-	// 	if (this._toolchainsConfig === undefined) {
-	// 		const configPath = path.join(os.homedir(), '.pcons', 'toolchains.json');
-	// 		if (existsSync(configPath)) {
-	// 			try {
-	// 				const data = readFileSync(configPath, 'utf8');
-	// 				this._toolchainsConfig = JSON.parse(data)['toolchains'];
-	// 			} catch (err) {
-	// 				console.error(err);
-	// 				return undefined;
-	// 			}
-	// 		} else {
-	// 			return undefined;
-	// 		}
-	// 	}
-	// 	if (!this._toolchainsConfig) {
-	// 		return undefined;
-	// 	}
-	// 	return this._toolchainsConfig[toolchain];
-	// }
 
 	async debuggerPath() {
 		const debuggerPath = this.getConfig<string>('debuggerPath');
 		if (debuggerPath) {
 			return debuggerPath;
 		}
-		// const config = await this.toolchainConfig();
-		// if (config !== undefined && 'dbg' in config) {
-		// 	return config['dbg'];
-		// }
 	}
 
 	async ensureConfigured() {
@@ -424,10 +365,7 @@ export class pcons implements vscode.Disposable {
 	}
 
 	notifyUpdated() {
-		if (this._cppToolsApi !== undefined && this._cppToolsProvider !== undefined) {
-			this._cppToolsProvider.resetCache();
-			this._cppToolsApi.didChangeCustomConfiguration(this._cppToolsProvider);
-		}
+		// no op for now
 	}
 
 	async generate(debug = false) {
@@ -438,9 +376,6 @@ export class pcons implements vscode.Disposable {
 
 		this.extensionContext.environmentVariableCollection.replace('PCONS_BUILD_DIR', this.buildPath);
 		this.extensionContext.environmentVariableCollection.replace('PCONS_SOURCE_DIR', this.projectRoot);
-		// if (this._toolchain !== undefined) {
-		// 	this.extensionContext.environmentVariableCollection.replace('PCONS_TOOLCHAIN', this._toolchain);
-		// }
 	}
 
 	async build(debug = false) {
@@ -590,35 +525,6 @@ export class pcons implements vscode.Disposable {
 		}
 	}
 
-	_cppToolsApi: CppToolsApi | undefined = undefined;
-	_cppToolsProvider: CppToolsConfigurationProvider | undefined = undefined;
-
-	async initCppTools() {
-		this._cppToolsApi = await getCppToolsApi(Version.v5);
-		this._cppToolsProvider = new CppToolsConfigurationProvider(this);
-		if (this._cppToolsApi) {
-			if (this._cppToolsApi.notifyReady) {
-				// Inform cpptools that a custom config provider will be able to service the current workspace.
-				this._cppToolsApi.registerCustomConfigurationProvider(this._cppToolsProvider);
-
-				// Do any required setup that the provider needs.
-				// await this._cppToolsProvider.refresh();
-
-				// Notify cpptools that the provider is ready to provide IntelliSense configurations.
-				this._cppToolsApi.notifyReady(this._cppToolsProvider);
-			} else {
-				// Running on a version of cpptools that doesn't support v2 yet.
-
-				// Do any required setup that the provider needs.
-				// await this._cppToolsProvider.refresh();
-
-				// Inform cpptools that a custom config provider will be able to service the current workspace.
-				this._cppToolsApi.registerCustomConfigurationProvider(this._cppToolsProvider);
-				this._cppToolsApi.didChangeCustomConfiguration(this._cppToolsProvider);
-			}
-		}
-
-	}
 
 	async onLoaded() {
 		vscode.commands.executeCommand("setContext", "inPconsProject", true);
@@ -631,7 +537,7 @@ export class pcons implements vscode.Disposable {
 			vscode.window.showErrorMessage(e.toString());
 		}
 
-		// await this.initCppTools();
+		// TODO: Test Explorer integration (pconsTestAdapter) is kept for future work.
 		// await this.initTestExplorer();
 	}
 };

@@ -246,7 +246,6 @@
     "typescript-eslint": "^8.56.1"
   },
   "extensionDependencies": [
-    "hbenl.vscode-test-explorer",
-    "ms-vscode.cpptools"
+    "hbenl.vscode-test-explorer"
   ]
 }

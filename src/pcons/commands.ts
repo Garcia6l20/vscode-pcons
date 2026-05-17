@@ -196,7 +196,7 @@ export async function generate(ext: pcons, debug = false) {
 function baseArgs(ext: pcons): string[] {
     let args = ['-B', ext.buildPath, ...getLogArgs()];
     const jobs = ext.getConfig<number>('jobs');
-    if (jobs !== undefined) {
+    if (jobs !== undefined && jobs > 0) {
         args.push('-j', jobs.toString());
     }
     return args;

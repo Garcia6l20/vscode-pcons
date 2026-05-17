@@ -254,16 +254,14 @@ export async function channelExec(command: string,
     cancellable: boolean = true,
     cwd: string | undefined = undefined,
     diagnostics: vscode.DiagnosticCollection | undefined = undefined) {
-    const commandName = command === 'code' ? parameters[0] : command;
     let stream = new Stream('python', ['-u', '-m', 'pcons', command, ...parameters], { cwd: cwd });
-    title = title ?? `Executing ${commandName} ${parameters.join(' ')}`;
+    title = title ?? `Executing ${command} ${parameters.join(' ')}`;
     const channel = getOutputChannel();
     channel.clear();
     channel.show();
-    channel.info('executing:', commandName);
+    channel.info(title);
     channel.trace('command args:', ...parameters);
     diagnostics?.clear();
-    const barExpr = /(\d+)-(.+):\s+(?:(\d+?)%\|.+?\|)?\s*(.+?)\s\[(.+?)\]/;
     const logStream = new LogStream(channel);
     logStream.bars.get('make', true);
     logStream.bars.onCancellationRequested(() => stream.kill());
@@ -276,12 +274,12 @@ export async function channelExec(command: string,
     const statusStr = rc === 0 ? 'succeed' : 'failed';
     logStream.dispose();
     if (rc !== 0) {
-        channel.error(`command: ${commandName} failed`);
-        vscode.window.showErrorMessage(`pcons: ${commandName} ${statusStr}: see output log`);
+        channel.error(`command: ${command} failed`);
+        vscode.window.showErrorMessage(`pcons: ${command} ${statusStr}: see output log`);
         channel.show();
-        throw Error(`command: ${commandName} failed`);
+        throw Error(`command: ${command} failed`);
     } else {
-        channel.info(`command: ${commandName} succeed`);
+        channel.info(`command: ${command} succeed`);
     }
 }
 
