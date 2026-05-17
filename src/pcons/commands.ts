@@ -108,7 +108,7 @@ export async function getTestSuites(ext: pcons): Promise<TestSuiteInfo> {
     return codeCommand<TestSuiteInfo>(ext, 'get-test-suites');
 }
 
-export async function generate(ext: pcons) {
+export async function generate(ext: pcons, debug = false) {
     // const toolchain = await ext.currentToolchain();
     // if (toolchain === undefined) {
     //     return;
@@ -122,7 +122,12 @@ export async function generate(ext: pcons) {
     }
     args.push(...getLogArgs());
     // args.push('--toolchain', toolchain);
-    await channelExec('generate', args, undefined, true, ext.projectRoot);
+
+    if (debug) {
+        await debugExec(ext, ['generate', ...args]);
+    } else {
+        await channelExec('generate', args, undefined, true, ext.projectRoot);
+    }
 
     const metadataArgs = [...args, '-G', 'metadata'];
     await channelExec(

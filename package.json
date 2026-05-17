@@ -36,8 +36,8 @@
         "title": "pcons: Debug"
       },
       {
-        "command": "pcons.debugBuild",
-        "title": "pcons: Debug Build"
+        "command": "pcons.debugGenerate",
+        "title": "pcons: Debug Generate"
       },
       {
         "command": "pcons.clean",
@@ -128,7 +128,7 @@
       {
         "key": "ctrl+shift+f7",
         "when": "inPconsProject",
-        "command": "pcons.debugBuild"
+        "command": "pcons.debugGenerate"
       },
       {
         "key": "ctrl+f7",
@@ -182,11 +182,6 @@
           "command": "pcons.build",
           "when": "inPconsProject",
           "group": "pcons:build"
-        },
-        {
-          "command": "pcons.debugBuild",
-          "when": "inPconsProject",
-          "group": "pcons:debug"
         },
         {
           "command": "pcons.run",

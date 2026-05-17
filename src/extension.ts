@@ -355,9 +355,9 @@ export class pcons implements vscode.Disposable {
 		}
 	}
 
-	async generate() {
+	async generate(debug = false) {
 		this._config = undefined;
-		await commands.generate(this);
+		await commands.generate(this, debug);
 		await this.refreshTargets();
 		this.notifyUpdated();
 
@@ -471,7 +471,7 @@ export class pcons implements vscode.Disposable {
 		// register('scanToolchains', async () => commands.scanToolchains(this));
 		register('configure', async () => this.generate());
 		register('build', async () => this.build());
-		register('debugBuild', async () => this.build(true));
+		register('debugGenerate', async () => this.generate(true));
 		register('clean', async () => this.clean());
 		register('run', async () => this.run());
 		register('debug', async () => this.debug());
