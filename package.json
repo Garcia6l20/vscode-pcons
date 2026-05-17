@@ -78,6 +78,18 @@
       {
         "command": "pcons.clearDiags",
         "title": "pcons: Clear Diagnostics"
+      },
+      {
+        "command": "pcons.buildTarget",
+        "title": "pcons: Build Target"
+      },
+      {
+        "command": "pcons.runTarget",
+        "title": "pcons: Run Target"
+      },
+      {
+        "command": "pcons.debugTarget",
+        "title": "pcons: Debug Target"
       }
     ],
     "configuration": {

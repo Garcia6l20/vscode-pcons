@@ -3,6 +3,7 @@
 import * as vscode from 'vscode';
 import * as commands from './pcons/commands';
 import * as debuggerModule from './pcons/debugger';
+import { PconsCodeLensProvider } from './pcons/codelens';
 import * as path from 'path';
 import * as os from 'os';
 import { Target } from './pcons/targets';
@@ -60,6 +61,7 @@ export class pcons implements vscode.Disposable {
 	testsChanged = new vscode.EventEmitter<string[]>();
 	// currentToolchainChanged = new vscode.EventEmitter<string | undefined>();
 	buildDiagnostics: vscode.DiagnosticCollection;
+    private readonly _codeLensProvider: PconsCodeLensProvider;
 
 	private readonly _statusBar = new StatusBar(this);
 
@@ -74,6 +76,12 @@ export class pcons implements vscode.Disposable {
 			throw new Error('Cannot resolve project root');
 		}
 		this.targets = [];
+		this._codeLensProvider = new PconsCodeLensProvider(this);
+		extensionContext.subscriptions.push(this._codeLensProvider);
+		extensionContext.subscriptions.push(vscode.languages.registerCodeLensProvider(
+			{ language: 'python', pattern: '**/pcons-build.py' },
+			this._codeLensProvider,
+		));
 		vscode.workspace.onDidChangeConfiguration((e: vscode.ConfigurationChangeEvent) => {
 			this.codeConfig = vscode.workspace.getConfiguration("pcons");
 		});
@@ -176,6 +184,73 @@ export class pcons implements vscode.Disposable {
 				this.buildTargetsChanged.fire(this.buildTargets);
 			}
 		}
+
+		this._codeLensProvider.refresh();
+	}
+
+	private findTarget(name: string): Target | undefined {
+		const normalizedName = name.replace(/\\/g, '/').replace(/^\.\//, '');
+		const buildDirName = path.basename(this.buildPath).replace(/\\/g, '/');
+		const prefix = `${buildDirName}/`;
+		const strippedName = normalizedName.startsWith(prefix)
+			? normalizedName.substring(prefix.length)
+			: normalizedName;
+
+		return this.targets.find((target) =>
+			target.fullname === name
+			|| target.fullname === normalizedName
+			|| target.fullname === strippedName
+			|| target.name === name
+		);
+	}
+
+	private async ensureTargetsLoaded(): Promise<void> {
+		if (this.targets.length === 0) {
+			await this.refreshTargets();
+		}
+	}
+
+	async buildTarget(name: string) {
+		await this.ensureConfigured();
+		await this.ensureTargetsLoaded();
+		const target = this.findTarget(name);
+		if (target === undefined) {
+			throw new Error(`Target not found: ${name}`);
+		}
+		await commands.build(this, [target]);
+		this.notifyUpdated();
+	}
+
+	async runTarget(name: string) {
+		await this.ensureConfigured();
+		await this.ensureTargetsLoaded();
+		const target = this.findTarget(name);
+		if (target === undefined) {
+			throw new Error(`Target not found: ${name}`);
+		}
+		if (!target.executable) {
+			throw new Error(`Target is not executable: ${name}`);
+		}
+		this.launchTarget = target;
+		this.launchTargetChanged.fire(this.launchTarget);
+		await commands.run(this);
+	}
+
+	async debugTarget(name: string) {
+		await this.ensureConfigured();
+		await this.ensureTargetsLoaded();
+		const target = this.findTarget(name);
+		if (target === undefined) {
+			throw new Error(`Target not found: ${name}`);
+		}
+		if (!target.executable) {
+			throw new Error(`Target is not executable: ${name}`);
+		}
+		this.launchTarget = target;
+		this.launchTargetChanged.fire(this.launchTarget);
+		await commands.build(this, [target]);
+		const args = this.makeArgumentList(this.launchTargetArguments[this.launchTarget.fullname] ?? "");
+		await debuggerModule.debug(this.launchTarget, args);
 	}
 
 	async invalidateConfig() {
@@ -488,6 +563,9 @@ export class pcons implements vscode.Disposable {
 		register('executableArguments', async () => this.executableArguments());
 		register('debugWithArgs', async () => this.debugWithArgs());
 		register('commandDebug', async () => this.commandDebug());
+		register('buildTarget', async (name: string) => this.buildTarget(name));
+		register('runTarget', async (name: string) => this.runTarget(name));
+		register('debugTarget', async (name: string) => this.debugTarget(name));
 	}
 
 	async initTestExplorer() {
