@@ -226,6 +226,7 @@ export class Pcons implements vscode.Disposable {
 		}
 		this.launchTarget = target;
 		this.launchTargetChanged.fire(this.launchTarget);
+		await this.ensureBuilt();
 		await commands.run(this);
 	}
 
@@ -242,6 +243,7 @@ export class Pcons implements vscode.Disposable {
 		this.launchTarget = target;
 		this.launchTargetChanged.fire(this.launchTarget);
 		await this.executableArguments(target.fullname);
+		await this.ensureBuilt();
 		const args = this.makeArgumentList(this.launchTargetArguments[target.fullname] ?? "");
 		await commands.run(this, args);
 	}
@@ -258,7 +260,7 @@ export class Pcons implements vscode.Disposable {
 		}
 		this.launchTarget = target;
 		this.launchTargetChanged.fire(this.launchTarget);
-		await commands.build(this, [target]);
+		await this.ensureBuilt();
 		const args = this.makeArgumentList(this.launchTargetArguments[this.launchTarget.fullname] ?? "");
 		await debuggerModule.debug(this.launchTarget, args);
 	}
@@ -276,7 +278,7 @@ export class Pcons implements vscode.Disposable {
 		this.launchTarget = target;
 		this.launchTargetChanged.fire(this.launchTarget);
 		await this.executableArguments(target.fullname);
-		await commands.build(this, [target]);
+		await this.ensureBuilt();
 		const args = this.makeArgumentList(this.launchTargetArguments[target.fullname] ?? "");
 		await debuggerModule.debug(target, args);
 	}
@@ -401,6 +403,12 @@ export class Pcons implements vscode.Disposable {
 		}
 	}
 
+	async ensureBuilt() {
+		if (this.launchTarget) {
+			await commands.build(this, [this.launchTarget]);
+		}
+	}
+
 	notifyUpdated() {
 		// no op for now
 	}
@@ -449,6 +457,7 @@ export class Pcons implements vscode.Disposable {
 			await this.promptLaunchTarget();
 		}
 		if (this.launchTarget && this.launchTarget.executable) {
+			await this.ensureBuilt();
 			const args = this.makeArgumentList(this.launchTargetArguments[this.launchTarget.fullname] ?? "");
 			await commands.run(this, args);
 		}
@@ -460,7 +469,7 @@ export class Pcons implements vscode.Disposable {
 			await this.promptLaunchTarget();
 		}
 		if (this.launchTarget && this.launchTarget.executable) {
-			await commands.build(this, [this.launchTarget]);
+			await this.ensureBuilt();
 			const args = this.makeArgumentList(this.launchTargetArguments[this.launchTarget.fullname] ?? "");
 			await debuggerModule.debug(this.launchTarget, args);
 		}
