@@ -29,20 +29,19 @@ enum BuildType {
 
 }
 
-interface pconsSettings {
+interface PconsSettings {
 	build_type: BuildType
 }
 
-interface pconsConfig {
+interface PconsConfig {
 	source_path: string,
 	build_path: string,
-	toolchain: string,
-	settings: pconsSettings,
+	settings: PconsSettings,
 }
 
 type StringMap = { [key: string]: string };
 
-export class pcons implements vscode.Disposable {
+export class Pcons implements vscode.Disposable {
 	codeConfig: vscode.WorkspaceConfiguration;
 	workspaceFolder: vscode.WorkspaceFolder;
 	projectRoot: string;
@@ -133,7 +132,7 @@ export class pcons implements vscode.Disposable {
 	 * Create the instance
 	 */
 	static async create(context: vscode.ExtensionContext) {
-		gExtension = new pcons(context);
+		gExtension = new Pcons(context);
 
 		await gExtension.registerCommands();
 		await gExtension.onLoaded();
@@ -334,14 +333,14 @@ export class pcons implements vscode.Disposable {
 		return this.tests;
 	}
 
-	private _config: pconsConfig | undefined = undefined;
-	get config(): pconsConfig | undefined {
+	private _config: PconsConfig | undefined = undefined;
+	get config(): PconsConfig | undefined {
 		if (this._config === undefined) {
 			const configPath = path.join(this.buildPath, 'pcons.config.json');
 			if (existsSync(configPath)) {
 				try {
 					const data = readFileSync(configPath, 'utf8');
-					this._config = JSON.parse(data) as pconsConfig;
+					this._config = JSON.parse(data) as PconsConfig;
 				} catch (err) {
 					console.error(err);
 				}
@@ -543,12 +542,12 @@ export class pcons implements vscode.Disposable {
 };
 
 
-export let gExtension: pcons | null = null;
+export let gExtension: Pcons | null = null;
 
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
 export async function activate(context: vscode.ExtensionContext) {
-	await pcons.create(context);
+	await Pcons.create(context);
 }
 
 // This method is called when your extension is deactivated

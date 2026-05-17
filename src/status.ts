@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { pcons } from './extension';
+import { Pcons } from './extension';
 import { Target } from './pcons/targets';
 
 // Button class
@@ -69,7 +69,7 @@ abstract class Button {
 
 
 class BuildButton extends Button {
-    constructor(ext : pcons, protected readonly priority: number) {
+    constructor(ext: Pcons, protected readonly priority: number) {
         super(priority);
         this.command = 'pcons.build';
         this.text = 'Build';
@@ -97,7 +97,7 @@ class BuildButton extends Button {
 
 class LaunchButton extends Button {
     settingsName = 'launch';
-    constructor(ext: pcons, protected readonly priority: number) {
+    constructor(ext: Pcons, protected readonly priority: number) {
         super(priority);
         this.command = 'pcons.run';
         this.icon = 'play';
@@ -125,7 +125,7 @@ class LaunchButton extends Button {
 
 class DebugButton extends Button {
     settingsName = 'debug';
-    constructor(ext: pcons, protected readonly priority: number) {
+    constructor(ext: Pcons, protected readonly priority: number) {
         super(priority);
         this.command = 'pcons.debug';
         this.icon = 'debug-alt';
@@ -153,7 +153,7 @@ class DebugButton extends Button {
 
 class TestButton extends Button {
     settingsName = 'test';
-    constructor(ext: pcons, protected readonly priority: number) {
+    constructor(ext: Pcons, protected readonly priority: number) {
         super(priority);
         this.command = 'pcons.test';
         this.icon = 'beaker';
@@ -163,7 +163,7 @@ class TestButton extends Button {
 }
 
 class SelectLaunchTargetButton extends Button {
-    constructor(ext: pcons, protected readonly priority: number) {
+    constructor(ext: Pcons, protected readonly priority: number) {
         super(priority);
         this.command = 'pcons.selectLaunchTarget';
         this.text = 'none';
@@ -176,7 +176,7 @@ class SelectLaunchTargetButton extends Button {
 }
 
 class SelectBuildTypeButton extends Button {
-    constructor(ext: pcons, protected readonly priority: number) {
+    constructor(ext: Pcons, protected readonly priority: number) {
         super(priority);
         this.command = 'pcons.selectBuildType';
         this.text = 'debug';
@@ -189,7 +189,7 @@ class SelectBuildTypeButton extends Button {
 }
 
 class SelectBuildTargetsButton extends Button {
-    constructor(ext: pcons, protected readonly priority: number) {
+    constructor(ext: Pcons, protected readonly priority: number) {
         super(priority);
         this.command = 'pcons.selectBuildTargets';
         this.text = 'all';
@@ -208,7 +208,7 @@ class SelectBuildTargetsButton extends Button {
 }
 
 class SelectTestTargetsButton extends Button {
-    constructor(ext: pcons, protected readonly priority: number) {
+    constructor(ext: Pcons, protected readonly priority: number) {
         super(priority);
         this.command = 'pcons.selectTestTargets';
         this.text = 'test all';
@@ -226,25 +226,11 @@ class SelectTestTargetsButton extends Button {
     }
 }
 
-// class SelectToolchainButton extends Button {
-//     constructor(ext: pcons, protected readonly priority: number) {
-//         super(priority);
-//         this.command = 'pcons.selectToolchain';
-//         this.text = 'none';
-//         this.tooltip = 'Select toolchain';
-//         ext.currentToolchainChanged.event((toolchain: string|undefined) => {
-//             this.text = toolchain??'none';
-//             this.update();
-//         });
-//     }
-// }
-
 export class StatusBar implements vscode.Disposable {
 
   private readonly _buttons: Button[];
-  constructor(ext: pcons) {
-    this._buttons = [
-        // new SelectToolchainButton(ext, 1),
+    constructor(ext: Pcons) {
+        this._buttons = [
         new SelectBuildTypeButton(ext, 0.95),
         new SelectLaunchTargetButton(ext, 0.9),
         new DebugButton(ext, 0.8),

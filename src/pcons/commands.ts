@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import { channelExec, execInTerminal, handleDiagnostics, Stream, getLogArgs } from "./run";
-import { pcons } from "../extension";
+import { Pcons } from "../extension";
 import { isTarget, Target } from "./targets";
 import { TestSuiteInfo, TestInfo } from "./testAdapter";
 import { DebuggerEnvironmentVariable } from "./debugger";
@@ -14,7 +14,7 @@ import { PconsMetadataAlias, PconsMetadataTarget, readMetadata } from "./metadat
 const pconsBaseArgs = ['-u', '-m', 'pcons'];
 const codeInterfaceArgs = [...pconsBaseArgs, 'code'];
 
-export async function codeCommand<T>(ext: pcons, fn: string, ...args: string[]): Promise<T> {
+export async function codeCommand<T>(ext: Pcons, fn: string, ...args: string[]): Promise<T> {
     let stream = new Stream('python', [...codeInterfaceArgs, fn, ...args], {
         env: {
             ...process.env,
@@ -44,11 +44,11 @@ export async function codeCommand<T>(ext: pcons, fn: string, ...args: string[]):
     }
 }
 
-export async function getToolchains(ext: pcons): Promise<string[]> {
+export async function getToolchains(ext: Pcons): Promise<string[]> {
     return codeCommand<string[]>(ext, 'get-toolchains');
 }
 
-export async function getTargets(ext: pcons): Promise<Target[]> {
+export async function getTargets(ext: Pcons): Promise<Target[]> {
     const metadata = await readMetadata(ext.buildPath);
     if (metadata === undefined) {
         throw new Error(`pcons metadata not found in ${ext.buildPath}`);
@@ -154,19 +154,15 @@ function metadataAliasToTarget(alias: PconsMetadataAlias, projectRoot: string): 
 }
 
 
-export async function getTests(ext: pcons): Promise<string[]> {
+export async function getTests(ext: Pcons): Promise<string[]> {
     return codeCommand<string[]>(ext, 'get-tests');
 }
 
-export async function getTestSuites(ext: pcons): Promise<TestSuiteInfo> {
+export async function getTestSuites(ext: Pcons): Promise<TestSuiteInfo> {
     return codeCommand<TestSuiteInfo>(ext, 'get-test-suites');
 }
 
-export async function generate(ext: pcons, debug = false) {
-    // const toolchain = await ext.currentToolchain();
-    // if (toolchain === undefined) {
-    //     return;
-    // }
+export async function generate(ext: Pcons, debug = false) {
     let args = ['-B', ext.buildPath, '-b', `${ext.projectRoot}/pcons-build.py`];
     const variables = ext.getConfig<Object>('variables');
     if (variables !== undefined) {
@@ -175,7 +171,6 @@ export async function generate(ext: pcons, debug = false) {
         }
     }
     args.push(...getLogArgs());
-    // args.push('--toolchain', toolchain);
 
     if (debug) {
         await debugExec(ext, ['generate', ...args]);
@@ -193,7 +188,7 @@ export async function generate(ext: pcons, debug = false) {
     );
 }
 
-function baseArgs(ext: pcons): string[] {
+function baseArgs(ext: Pcons): string[] {
     let args = ['-B', ext.buildPath, ...getLogArgs()];
     const jobs = ext.getConfig<number>('jobs');
     if (jobs !== undefined && jobs > 0) {
@@ -214,7 +209,7 @@ interface PythonDebugConfiguration {
     environment?: DebuggerEnvironmentVariable[];
 }
 
-export async function build(ext: pcons, targets: Target[] | string[] = [], debug = false) {
+export async function build(ext: Pcons, targets: Target[] | string[] = [], debug = false) {
     let args = baseArgs(ext);
     if (targets.length !== 0) {
         args.push(...targets.map((t) => {
@@ -232,7 +227,7 @@ export async function build(ext: pcons, targets: Target[] | string[] = [], debug
     }
 }
 
-export async function debugExec(ext: pcons, args: string[]) {
+export async function debugExec(ext: Pcons, args: string[]) {
     const cfg: PythonDebugConfiguration = {
         name: 'pcons build',
         type: 'python',
@@ -245,11 +240,11 @@ export async function debugExec(ext: pcons, args: string[]) {
     await vscode.debug.startDebugging(undefined, cfg);
 }
 
-export async function clean(ext: pcons) {
+export async function clean(ext: Pcons) {
     return channelExec('clean', ['--no-status', ...baseArgs(ext), ...ext.buildTargets.map(t => t.fullname)], undefined, true, ext.projectRoot);
 }
 
-export async function run(ext: pcons, args?: string[]) {
+export async function run(ext: Pcons, args?: string[]) {
     const target = ext.launchTarget;
     if (!target || !target.executable) {
         throw new Error('No executable launch target selected');
@@ -268,7 +263,7 @@ export async function run(ext: pcons, args?: string[]) {
     );
 }
 
-export async function test(ext: pcons) {
+export async function test(ext: Pcons) {
     let args = baseArgs(ext);
     args.push(...ext.tests);
     return channelExec('test', args, undefined, true, ext.projectRoot);

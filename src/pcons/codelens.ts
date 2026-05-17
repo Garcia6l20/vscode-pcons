@@ -1,13 +1,13 @@
 import * as path from "path";
 import * as vscode from "vscode";
-import { pcons } from "../extension";
+import { Pcons } from "../extension";
 import { readMetadata } from "./metadata";
 
 export class PconsCodeLensProvider implements vscode.CodeLensProvider, vscode.Disposable {
     private readonly changeEmitter = new vscode.EventEmitter<void>();
     readonly onDidChangeCodeLenses = this.changeEmitter.event;
 
-    constructor(private readonly ext: pcons) {
+    constructor(private readonly ext: Pcons) {
     }
 
     refresh(): void {

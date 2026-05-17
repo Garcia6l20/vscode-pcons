@@ -17,7 +17,7 @@ import {
 } from "vscode-test-adapter-api";
 import { promises as fsPromises } from 'fs';
 import { Log } from "vscode-test-adapter-util";
-import { pcons } from "../extension";
+import { Pcons } from "../extension";
 import { Target } from "./targets";
 import { existsSync as fileExists } from 'fs';
 import { Stream } from "./run";
@@ -55,7 +55,7 @@ export class pconsTestAdapter implements TestAdapter {
     >();
 
     constructor(
-        private readonly ext: pcons,
+        private readonly ext: Pcons,
         private readonly log: Log
     ) {
         this.log.info('Initializing pcons test adapter');
