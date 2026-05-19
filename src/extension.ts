@@ -21,16 +21,8 @@ class TargetPickItem {
 	}
 };
 
-enum BuildType {
-	debug = 0,
-	release = 1,
-	releaseMinSize = 2,
-	releaseDebugInfos = 3,
-
-}
-
 interface PconsSettings {
-	build_type: BuildType
+	// empty for now
 }
 
 interface PconsConfig {
@@ -49,8 +41,8 @@ export class Pcons implements vscode.Disposable {
 	launchTarget: Target | undefined = undefined;
 	launchTargetArguments: StringMap = {};
 	_debugCommandArguments: string = "configure";
-	_buildType: string = 'Debug';
-	buildTypeChanged = new vscode.EventEmitter<string>();
+	_variant: string = 'Debug';
+	variantChanged = new vscode.EventEmitter<string>();
 	launchTargetChanged = new vscode.EventEmitter<Target | undefined>();
 	buildTargets: Target[] = [];
 	buildTargetsChanged = new vscode.EventEmitter<Target[]>();
@@ -108,10 +100,10 @@ export class Pcons implements vscode.Disposable {
 		this.launchTargetArguments = this.extensionContext.workspaceState.get<StringMap>('launchTargetArguments', this.launchTargetArguments);
 		this._debugCommandArguments = this.extensionContext.workspaceState.get<string>('debugCommandArguments', this._debugCommandArguments);
 
-		this._buildType = this.extensionContext.workspaceState.get<string>('buildType', 'Debug');
-		this.buildTypeChanged.fire(this.buildType);
-		this.buildTypeChanged.event((value: string) => {
-			this.extensionContext.workspaceState.update('buildType', value);
+		this._variant = this.extensionContext.workspaceState.get<string>('variant', 'Debug');
+		this.variantChanged.fire(this._variant);
+		this.variantChanged.event((value: string) => {
+			this.extensionContext.workspaceState.update('variant', value);
 		});
 	}
 
@@ -119,8 +111,8 @@ export class Pcons implements vscode.Disposable {
 		return this.codeConfig.get<T>(name);
 	}
 
-	get buildType(): string {
-		return this._buildType.toLocaleLowerCase().replace(' ', '_');
+	get variant(): string | undefined {
+		return this._variant;
 	}
 
 	get buildPath(): string {
@@ -128,7 +120,7 @@ export class Pcons implements vscode.Disposable {
 		return p//
 			.replace('${workspaceFolder}', this.workspaceFolder.uri.fsPath)//
 			// Toolchain variable removed
-			.replace('${buildType}', this.buildType ?? 'debug');
+			.replace('${variant}', this.variant ?? 'debug');
 	}
 
 	/**
@@ -204,7 +196,7 @@ export class Pcons implements vscode.Disposable {
 	}
 
 	async buildTarget(name: string) {
-		await this.ensureConfigured();
+		await this.ensureGenerated();
 		await this.ensureTargetsLoaded();
 		const target = this.findTarget(name);
 		if (target === undefined) {
@@ -215,7 +207,7 @@ export class Pcons implements vscode.Disposable {
 	}
 
 	async runTarget(name: string) {
-		await this.ensureConfigured();
+		await this.ensureGenerated();
 		await this.ensureTargetsLoaded();
 		const target = this.findTarget(name);
 		if (target === undefined) {
@@ -231,7 +223,7 @@ export class Pcons implements vscode.Disposable {
 	}
 
 	async runTargetWithArgs(name: string) {
-		await this.ensureConfigured();
+		await this.ensureGenerated();
 		await this.ensureTargetsLoaded();
 		const target = this.findTarget(name);
 		if (target === undefined) {
@@ -249,7 +241,7 @@ export class Pcons implements vscode.Disposable {
 	}
 
 	async debugTarget(name: string) {
-		await this.ensureConfigured();
+		await this.ensureGenerated();
 		await this.ensureTargetsLoaded();
 		const target = this.findTarget(name);
 		if (target === undefined) {
@@ -266,7 +258,7 @@ export class Pcons implements vscode.Disposable {
 	}
 
 	async debugTargetWithArgs(name: string) {
-		await this.ensureConfigured();
+		await this.ensureGenerated();
 		await this.ensureTargetsLoaded();
 		const target = this.findTarget(name);
 		if (target === undefined) {
@@ -293,16 +285,18 @@ export class Pcons implements vscode.Disposable {
 		this.testsChanged.fire(this.tests);
 	}
 
-	async promptBuildType() {
-		const types = ['Debug', 'Release', 'Release min size', 'Release debug infos'];
-		let type = await vscode.window.showQuickPick(['Debug', 'Release', 'Release min size', 'Release debug infos']);
-		if (type) {
-			this._buildType = type;
-			this.buildTypeChanged.fire(this.buildType);
-			await this.generate();
-			await this.invalidateConfig();
+	async promptVariant() {
+		const variants = this.getConfig<string[]>('variants');
+		if (!variants || variants.length === 0) {
+			vscode.window.showInformationMessage('No variant defined in configuration');
+			return;
 		}
-		return this.buildType;
+		const variant = await vscode.window.showQuickPick(variants);
+		if (variant) {
+			this._variant = variant;
+			this.variantChanged.fire(this._variant);
+		}
+		return variant;
 	}
 
 	async promptLaunchTarget(fireEvent: boolean = true) {
@@ -397,10 +391,8 @@ export class Pcons implements vscode.Disposable {
 		}
 	}
 
-	async ensureConfigured() {
-		if (!this.config) {
-			await this.generate();
-		}
+	async ensureGenerated() {
+		await this.generate(); // no way to check if generate is up-to-date for now.
 	}
 
 	async ensureBuilt() {
@@ -424,7 +416,7 @@ export class Pcons implements vscode.Disposable {
 	}
 
 	async build(debug = false) {
-		await this.ensureConfigured();
+		await this.ensureGenerated();
 		await commands.build(this, this.buildTargets, debug);
 		this.notifyUpdated();
 	}
@@ -452,7 +444,7 @@ export class Pcons implements vscode.Disposable {
 	}
 
 	async run() {
-		await this.ensureConfigured();
+		await this.ensureGenerated();
 		if (!this.launchTarget || !this.launchTarget.executable) {
 			await this.promptLaunchTarget();
 		}
@@ -464,7 +456,7 @@ export class Pcons implements vscode.Disposable {
 	}
 
 	async debug() {
-		await this.ensureConfigured();
+		await this.ensureGenerated();
 		if (!this.launchTarget || !this.launchTarget.executable) {
 			await this.promptLaunchTarget();
 		}
@@ -476,7 +468,7 @@ export class Pcons implements vscode.Disposable {
 	}
 
 	async test() {
-		await this.ensureConfigured();
+		await this.ensureGenerated();
 		await commands.test(this);
 	}
 
@@ -537,7 +529,7 @@ export class Pcons implements vscode.Disposable {
 		});
 		register('selectLaunchTarget', async () => this.promptLaunchTarget());
 		register('selectBuildTargets', async () => this.promptBuildTargets());
-		register('selectBuildType', async () => this.promptBuildType());
+		register('selectVariant', async () => this.promptVariant());
 		register('selectTestTargets', async () => this.promptTests());
 		// register('selectToolchain', async () => this.selectToolchain());
 		// register('currentToolchain', async () => this.currentToolchain());

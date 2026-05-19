@@ -170,6 +170,12 @@ export async function generate(ext: Pcons, debug = false) {
             args.push(`${key}=${value}`);
         }
     }
+
+    const variant = ext.variant;
+    if (variant) {
+        args.push(`--variant=${variant}`);
+    }
+
     args.push(...getLogArgs());
 
     if (debug) {

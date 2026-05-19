@@ -60,8 +60,8 @@
         "title": "pcons: Select Build Targets"
       },
       {
-        "command": "pcons.selectBuildType",
-        "title": "pcons: Select Build Type"
+        "command": "pcons.selectVariant",
+        "title": "pcons: Select Variant"
       },
       {
         "command": "pcons.selectTestTargets",
@@ -129,8 +129,11 @@
         },
         "pcons.variants": {
           "type": "array",
-          "default": [],
-          "description": "Workspace variants to build"
+          "default": [
+            "debug",
+            "release"
+          ],
+          "description": "Available build variants. The first one will be used as default."
         },
         "pcons.variables": {
           "type": "object",
@@ -199,7 +202,7 @@
           "group": "pcons:build"
         },
         {
-          "command": "pcons.selectBuildType",
+          "command": "pcons.selectVariant",
           "when": "inPconsProject",
           "group": "pcons:build"
         },

@@ -175,14 +175,14 @@ class SelectLaunchTargetButton extends Button {
     }
 }
 
-class SelectBuildTypeButton extends Button {
+class SelectVariantButton extends Button {
     constructor(ext: Pcons, protected readonly priority: number) {
         super(priority);
-        this.command = 'pcons.selectBuildType';
-        this.text = 'debug';
-        this.tooltip = 'Select build type';
-        ext.buildTypeChanged.event((type: string) => {
-            this.text = type;
+        this.command = 'pcons.selectVariant';
+        this.text = ext.variant ?? 'none';
+        this.tooltip = 'Select variant';
+        ext.variantChanged.event((v: string) => {
+            this.text = v;
             this.update();
         });
     }
@@ -231,7 +231,7 @@ export class StatusBar implements vscode.Disposable {
   private readonly _buttons: Button[];
     constructor(ext: Pcons) {
         this._buttons = [
-        new SelectBuildTypeButton(ext, 0.95),
+            new SelectVariantButton(ext, 0.95),
         new SelectLaunchTargetButton(ext, 0.9),
         new DebugButton(ext, 0.8),
         new LaunchButton(ext, 0.7),

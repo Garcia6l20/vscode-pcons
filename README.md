@@ -8,7 +8,7 @@ The extension activates automatically when the workspace contains a pcons-build.
 
 - Configure, build, clean, run, debug, and test pcons targets from VS Code commands.
 - Automatic target discovery from generated pcons metadata.
-- Status bar controls for build type, launch target, build targets, and tests.
+- Status bar controls for build variant, launch target, build targets, and tests.
 - CodeLens actions on target definitions inside pcons-build.py:
 	- Build
 	- Run
@@ -41,7 +41,7 @@ Selection commands:
 
 - pcons: Select Launch Target
 - pcons: Select Build Targets
-- pcons: Select Build Type
+- pcons: Select Build Variant
 - pcons: Select Test Targets
 
 Advanced commands:
@@ -75,7 +75,7 @@ The extension contributes the following settings:
 
 - pcons.buildFolder (string, default: build)
 	- Build directory path.
-	- Supports ${workspaceFolder} and ${buildType} placeholders.
+	- Supports ${workspaceFolder} and ${variant} placeholders.
 - pcons.pythonPath (string, default: python)
 	- Python executable setting exposed by the extension.
 - pcons.debuggerPath (string, default: null)
@@ -84,8 +84,8 @@ The extension contributes the following settings:
 	- Maximum parallel jobs for build/test commands.
 - pcons.pythonDebugJustMyCode (boolean, default: true)
 	- Controls JustMyCode when debugging pcons python commands.
-- pcons.variants (array, default: [])
-	- Workspace variants passed to pcons.
+- pcons.variants (array, default: ["debug", "release"])
+	- Variants available for this project. The first one will be used as default.
 - pcons.variables (object, default: {})
 	- Workspace build variables forwarded to generate.
 
