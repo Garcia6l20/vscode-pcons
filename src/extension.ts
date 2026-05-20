@@ -6,7 +6,7 @@ import * as debuggerModule from './pcons/debugger';
 import { PconsCodeLensProvider } from './pcons/codelens';
 import * as path from 'path';
 import * as os from 'os';
-import { Target } from './pcons/targets';
+import { Target, TargetType } from './pcons/targets';
 import { StatusBar } from './status';
 import { pconsTestAdapter } from './pcons/testAdapter';
 import { TestHub, testExplorerExtensionId } from 'vscode-test-adapter-api';
@@ -202,7 +202,13 @@ export class Pcons implements vscode.Disposable {
 		if (target === undefined) {
 			throw new Error(`Target not found: ${name}`);
 		}
-		await commands.build(this, [target]);
+		let targets = [];
+		if (target.type === TargetType.Test) {
+			targets = target.dependencies.map(dep => this.findTarget(dep)).filter((t): t is Target => t !== undefined);
+		} else {
+			targets.push(target);
+		}
+		await commands.build(this, targets);
 		this.notifyUpdated();
 	}
 
@@ -301,7 +307,8 @@ export class Pcons implements vscode.Disposable {
 
 	async promptLaunchTarget(fireEvent: boolean = true) {
 		let targets = this.targets = await commands.getTargets(this);
-		targets = targets.filter(t => t.executable === true);
+		// Only programs are valid launch targets
+		targets = targets.filter(t => t.executable === true && t.type === 'program');
 		targets.sort((l, r) => l.fullname < r.fullname ? -1 : 1);
 		let target = await vscode.window.showQuickPick(targets.map(t => t.fullname));
 		if (fireEvent && target) {
@@ -313,6 +320,8 @@ export class Pcons implements vscode.Disposable {
 
 	async promptBuildTargets() {
 		let targets = this.targets = await commands.getTargets(this);
+		// Exclude test-type targets from build target selection
+		targets = targets.filter(t => t.type !== 'test');
 		targets.sort((l, r) => l.fullname < r.fullname ? -1 : 1);
 		let pick = vscode.window.createQuickPick<TargetPickItem>();
 		pick.canSelectMany = true;
@@ -517,7 +526,7 @@ export class Pcons implements vscode.Disposable {
 		};
 
 		// register('scanToolchains', async () => commands.scanToolchains(this));
-		register('configure', async () => this.generate());
+		register('generate', async () => this.generate());
 		register('build', async () => this.build());
 		register('debugGenerate', async () => this.generate(true));
 		register('clean', async () => this.clean());

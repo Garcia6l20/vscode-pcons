@@ -35,6 +35,10 @@ export interface TestInfo extends APITestInfo {
 
     /** Arguments for the test */
     args?: string[];
+    /** Resolved program path (absolute) */
+    program?: string;
+    /** Dependent test names that must be included/built before this test */
+    dependencies?: string[];
 
     /** stdout file */
     out: string;
@@ -127,13 +131,16 @@ export class pconsTestAdapter implements TestAdapter {
         // Use the test runner module directly and pass the manifest and a
         // regex that matches the test's name (label). Avoid unsupported
         // flags like -B/-q which the test runner doesn't accept.
+        const channel = getOutputChannel();
         const manifestPath = path.join(this.ext.buildPath, 'tests.json');
         const nameRegex = `^${this.escapeRegex(test.label ?? '')}$`;
-        const channel = getOutputChannel();
+
         channel.appendLine(`Running test ${test.id} with command: python -m pcons.test_runner --manifest ${manifestPath} -R ${nameRegex} -j 1`);
-        const stream = new Stream('python', ['-m', 'pcons.test_runner', '--manifest', manifestPath, '-R', nameRegex, '-j', '1'], {
+
+        let stream = new Stream('python', ['-m', 'pcons.test_runner', '--manifest', manifestPath, '-R', nameRegex, '-j', '1'], {
             cwd: this.ext.projectRoot,
         });
+
         let killed = false;
         this.runnintTests.push(stream);
         let out: string = '';
@@ -212,19 +219,34 @@ export class pconsTestAdapter implements TestAdapter {
     }
 
     getTargets(tests: string[]) {
-        let targets: string[] = [];
+        const targets: string[] = [];
+        const seenTests = new Set<string>();
+
+        const gather = (info: TestInfo | TestSuiteInfo) => {
+            if (info.type === 'suite') {
+                for (const child of info.children) {
+                    gather(child as TestInfo | TestSuiteInfo);
+                }
+                return;
+            }
+            // info is TestInfo
+            if (seenTests.has(info.id)) {
+                return;
+            }
+            seenTests.add(info.id);
+            if (info.dependencies) {
+                targets.push(...info.dependencies);
+            }
+        };
+
         for (const test of tests) {
             const info = this.getInfo(test);
             if (info === undefined) {
                 throw Error(`Cannot find infos of test ${test}`);
             }
-
-            if (info.type === 'test') {
-                targets.push(info.target);
-            } else {
-                targets.push(...this.getSuiteTargets(info));
-            }
+            gather(info as TestInfo | TestSuiteInfo);
         }
+
         return targets;
     }
 
@@ -248,7 +270,7 @@ export class pconsTestAdapter implements TestAdapter {
         try {
             await Promise.all(promises);
             this.testStatesEmitter.fire(<TestRunFinishedEvent>{ type: 'finished' });
-        } catch(err) {            
+        } catch (err) {
             this.testStatesEmitter.fire(<TestRunFinishedEvent>{ type: 'finished' });
             throw err;
         }
@@ -261,17 +283,20 @@ export class pconsTestAdapter implements TestAdapter {
             } else if (info.type === 'suite') {
                 throw Error('Cannot debug a test suite');
             }
+            // Build required targets including dependencies before debugging.
+            const targetsToBuild = this.getTargets([test]);
+            await commands.build(this.ext, targetsToBuild);
+
             let target: Target | undefined = undefined;
             for (const t of this.ext.targets) {
-                if (t.fullname === info.target) {
+                if (t.fullname === info.program) {
                     target = t;
                     break;
                 }
             }
             if (target === undefined) {
-                throw Error(`Cannot find target ${info.target}`);
+                throw Error(`Cannot find target ${info.program}`);
             }
-            await commands.build(this.ext, [target]);
             await debuggerModule.debug(target, info.args);
         }
     }

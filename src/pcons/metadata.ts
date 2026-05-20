@@ -1,5 +1,6 @@
 import { promises as fsPromises } from "fs";
 import * as path from "path";
+import { TargetType } from "./targets";
 
 export interface TargetDefinitionLocation {
     file: string;
@@ -9,7 +10,7 @@ export interface TargetDefinitionLocation {
 
 export interface PconsMetadataTarget {
     name: string;
-    type: string;
+    type: TargetType;
     is_default: boolean;
     dependencies: string[];
     sources: string[];

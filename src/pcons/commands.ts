@@ -70,32 +70,7 @@ function metadataTargetToTarget(
     projectRoot: string,
     buildDir: string
 ): Target {
-    const mainOutput = pickMainOutput(target);
-    const buildTargetName = stripBuildDirPrefix(mainOutput, buildDir);
-
-    const output = mainOutput.length > 0
-        ? path.resolve(projectRoot, mainOutput)
-        : "";
-
-    const sourcePath = target.sources.length > 0
-        ? path.resolve(projectRoot, path.dirname(target.sources[0]))
-        : projectRoot;
-
-    const buildPath = output.length > 0
-        ? path.dirname(output)
-        : projectRoot;
-
-    return {
-        name: target.name,
-        // Build commands need the concrete build target identifier used in
-        // build.ninja (often the first output path in subdir layouts).
-        fullname: buildTargetName.length > 0 ? buildTargetName : target.name,
-        output: output,
-        srcPath: sourcePath,
-        buildPath: buildPath,
-        executable: target.type === "program" && mainOutput.length > 0,
-        type: target.type,
-    };
+    return new Target(target, projectRoot, buildDir);
 }
 
 function pickMainOutput(target: PconsMetadataTarget): string {
@@ -142,20 +117,28 @@ function stripBuildDirPrefix(outputPath: string, buildDir: string): string {
 }
 
 function metadataAliasToTarget(alias: PconsMetadataAlias, projectRoot: string): Target {
-    return {
-        name: alias.name,
-        fullname: alias.name,
-        output: "",
-        srcPath: projectRoot,
-        buildPath: projectRoot,
-        executable: false,
-        type: "alias",
-    };
+    return new Target(alias, projectRoot, undefined);
 }
 
 
 export async function getTests(ext: Pcons): Promise<string[]> {
-    return codeCommand<string[]>(ext, 'get-tests');
+    const metadata = await readMetadata(ext.buildPath);
+    if (!metadata) {
+        return codeCommand<string[]>(ext, 'get-tests');
+    }
+
+    const tests: string[] = [];
+    for (const t of metadata.targets) {
+        if ((t as any).test === undefined) {
+            continue;
+        }
+        const targetObj = metadataTargetToTarget(t, ext.projectRoot, metadata.project.build_dir);
+        const spec: any = (t as any).test;
+        const testId = `${targetObj.fullname}:${spec.name}`;
+        tests.push(testId);
+    }
+    tests.sort();
+    return tests;
 }
 
 export async function getTestSuites(ext: Pcons): Promise<TestSuiteInfo> {
@@ -182,15 +165,22 @@ export async function getTestSuites(ext: Pcons): Promise<TestSuiteInfo> {
         const spec: any = (t as any).test;
 
         const testId = `${targetObj.fullname}:${spec.name}`;
+        const program = spec.command && spec.command.length > 0
+            ? spec.command[0]
+            : undefined;
+
         const testInfo: TestInfo = {
             id: testId,
             label: spec.name,
             type: 'test',
             file: path.resolve(ext.projectRoot, t.defined_at.file),
-            line: t.defined_at.line,
+            line: t.defined_at.line - 1, // Convert to 0-based line number
             target: targetObj.fullname,
             workingDirectory: spec.cwd ? path.resolve(ext.projectRoot, spec.cwd) : ext.buildPath,
             args: spec.command && Array.isArray(spec.command) ? spec.command.slice(1) : [],
+            program: program,
+            debuggable: program !== undefined,
+            dependencies: t.dependencies,
             out: path.join(ext.buildPath, `${testId}.out`),
             err: path.join(ext.buildPath, `${testId}.err`),
         };
