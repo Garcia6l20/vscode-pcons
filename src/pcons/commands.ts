@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import * as path from "path";
-import { channelExec, execInTerminal, handleDiagnostics, Stream, getLogArgs } from "./run";
+import { channelExec, execInTerminal, getLogArgs } from "./run";
 import { Pcons } from "../extension";
 import { isTarget, Target } from "./targets";
 import { TestSuiteInfo, TestInfo } from "./testAdapter";
@@ -10,43 +10,6 @@ import { PconsMetadataAlias, PconsMetadataTarget, readMetadata } from "./metadat
 // export async function scanToolchains(ext: pcons) {
 //     return channelExec('scan-toolchains', getLogArgs());
 // }
-
-const pconsBaseArgs = ['-u', '-m', 'pcons'];
-const codeInterfaceArgs = [...pconsBaseArgs, 'code'];
-
-export async function codeCommand<T>(ext: Pcons, fn: string, ...args: string[]): Promise<T> {
-    let stream = new Stream('python', [...codeInterfaceArgs, fn, ...args], {
-        env: {
-            ...process.env,
-            'pcons_BUILD_PATH': ext.buildPath,
-        },
-        cwd: ext.projectRoot,
-    });
-    let data = '';
-    stream.onLine((line: string, isError: boolean) => {
-        if (!handleDiagnostics(line, ext.buildDiagnostics)) {
-            data += line;
-        }
-    });
-    let rc = await stream.finished();
-    if (rc !== 0) {
-        const msg = `pcons: ${fn} failed: ${data}`;
-        console.error(msg);
-        throw Error(msg);
-    } else {
-        try {
-            return JSON.parse(data) as T;
-        } catch (e) {
-            const msg = `pcons: ${fn} failed to parse output: ${data}`;
-            console.error(msg);
-            throw Error(msg);
-        }
-    }
-}
-
-export async function getToolchains(ext: Pcons): Promise<string[]> {
-    return codeCommand<string[]>(ext, 'get-toolchains');
-}
 
 export async function getTargets(ext: Pcons): Promise<Target[]> {
     const metadata = await readMetadata(ext.buildPath);
@@ -73,49 +36,6 @@ function metadataTargetToTarget(
     return new Target(target, projectRoot, buildDir);
 }
 
-function pickMainOutput(target: PconsMetadataTarget): string {
-    if (target.outputs.length === 0) {
-        return "";
-    }
-
-    if (target.type !== "program") {
-        return target.outputs[0];
-    }
-
-    // Prefer the real executable when extra linker artifacts are present.
-    const executableCandidate = target.outputs.find((output) => {
-        const name = output.toLowerCase();
-        return !name.endsWith(".pdb")
-            && !name.endsWith(".ilk")
-            && !name.endsWith(".exp")
-            && !name.endsWith(".lib")
-            && !name.endsWith(".dylib")
-            && !name.endsWith(".so")
-            && !name.endsWith(".a");
-    });
-
-    return executableCandidate ?? target.outputs[0];
-}
-
-function stripBuildDirPrefix(outputPath: string, buildDir: string): string {
-    const normalizedOutput = outputPath.replace(/\\/g, "/").replace(/^\.\//, "");
-    const normalizedBuildDir = buildDir
-        .replace(/\\/g, "/")
-        .replace(/^\.\//, "")
-        .replace(/\/+$/, "");
-
-    if (normalizedBuildDir.length === 0 || normalizedBuildDir === ".") {
-        return normalizedOutput;
-    }
-
-    const prefix = `${normalizedBuildDir}/`;
-    if (normalizedOutput.startsWith(prefix)) {
-        return normalizedOutput.substring(prefix.length);
-    }
-
-    return normalizedOutput;
-}
-
 function metadataAliasToTarget(alias: PconsMetadataAlias, projectRoot: string): Target {
     return new Target(alias, projectRoot, undefined);
 }
@@ -124,7 +44,7 @@ function metadataAliasToTarget(alias: PconsMetadataAlias, projectRoot: string): 
 export async function getTests(ext: Pcons): Promise<string[]> {
     const metadata = await readMetadata(ext.buildPath);
     if (!metadata) {
-        return codeCommand<string[]>(ext, 'get-tests');
+        throw new Error(`pcons metadata not found in ${ext.buildPath}`);
     }
 
     const tests: string[] = [];
@@ -142,11 +62,9 @@ export async function getTests(ext: Pcons): Promise<string[]> {
 }
 
 export async function getTestSuites(ext: Pcons): Promise<TestSuiteInfo> {
-    // Prefer metadata when available so Test Explorer can use the
-    // pre-generated metadata JSON instead of invoking the code interface.
     const metadata = await readMetadata(ext.buildPath);
     if (!metadata) {
-        return codeCommand<TestSuiteInfo>(ext, 'get-test-suites');
+        throw new Error(`pcons metadata not found in ${ext.buildPath}`);
     }
 
     const root: TestSuiteInfo = {
@@ -293,13 +211,11 @@ export async function clean(ext: Pcons) {
 
 export async function run(ext: Pcons, args?: string[]) {
     const target = ext.launchTarget;
-    if (!target || !target.executable) {
+    if (!target || !target.executable || !target.output) {
         throw new Error('No executable launch target selected');
     }
 
-    const targetDirectory = target.output.length > 0
-        ? path.dirname(target.output)
-        : target.buildPath || ext.projectRoot;
+    const targetDirectory = path.dirname(target.output);
 
     execInTerminal(
         target.output,

@@ -5,13 +5,11 @@ import * as commands from './pcons/commands';
 import * as debuggerModule from './pcons/debugger';
 import { PconsCodeLensProvider } from './pcons/codelens';
 import * as path from 'path';
-import * as os from 'os';
 import { Target, TargetType } from './pcons/targets';
 import { StatusBar } from './status';
 import { pconsTestAdapter } from './pcons/testAdapter';
 import { TestHub, testExplorerExtensionId } from 'vscode-test-adapter-api';
 import { Log, TestAdapterRegistrar } from 'vscode-test-adapter-util';
-import { existsSync, readFileSync } from 'fs';
 import { str2cmdline } from './pcons/run';
 
 class TargetPickItem {
@@ -20,16 +18,6 @@ class TargetPickItem {
 		this.label = target.fullname;
 	}
 };
-
-interface PconsSettings {
-	// empty for now
-}
-
-interface PconsConfig {
-	source_path: string,
-	build_path: string,
-	settings: PconsSettings,
-}
 
 type StringMap = { [key: string]: string };
 
@@ -376,23 +364,6 @@ export class Pcons implements vscode.Disposable {
 		return this.tests;
 	}
 
-	private _config: PconsConfig | undefined = undefined;
-	get config(): PconsConfig | undefined {
-		if (this._config === undefined) {
-			const configPath = path.join(this.buildPath, 'pcons.config.json');
-			if (existsSync(configPath)) {
-				try {
-					const data = readFileSync(configPath, 'utf8');
-					this._config = JSON.parse(data) as PconsConfig;
-				} catch (err) {
-					console.error(err);
-				}
-			}
-		}
-		return this._config;
-	}
-
-
 	async debuggerPath() {
 		const debuggerPath = this.getConfig<string>('debuggerPath');
 		if (debuggerPath) {
@@ -415,7 +386,6 @@ export class Pcons implements vscode.Disposable {
 	}
 
 	async generate(debug = false) {
-		this._config = undefined;
 		await commands.generate(this, debug);
 		await this.refreshTargets();
 		this.notifyUpdated();
@@ -431,9 +401,7 @@ export class Pcons implements vscode.Disposable {
 	}
 
 	async clean() {
-		if (this.config) {
-			await commands.clean(this);
-		}
+		await commands.clean(this);
 	}
 
 	makeArgumentList(str: string) {

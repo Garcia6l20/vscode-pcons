@@ -20,10 +20,6 @@
   "contributes": {
     "commands": [
       {
-        "command": "pcons.configure",
-        "title": "pcons: Configure"
-      },
-      {
         "command": "pcons.generate",
         "title": "pcons: Generate"
       },
@@ -186,11 +182,6 @@
     ],
     "menus": {
       "touchBar": [
-        {
-          "command": "pcons.configure",
-          "when": "inPconsProject",
-          "group": "pcons:build"
-        },
         {
           "command": "pcons.selectLaunchTarget",
           "when": "inPconsProject",

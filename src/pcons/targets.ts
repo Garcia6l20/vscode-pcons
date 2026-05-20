@@ -1,62 +1,32 @@
 type Environment = Record<string, string>;
 
-export enum TargetType {
-    Program = "program",
-    Library = "library",
-    Test = "test",
-    Alias = "alias",
-}
-import { PconsMetadataTarget, PconsMetadataAlias, PconsMetadataTest } from './metadata';
+import { PconsMetadataTarget, PconsMetadataAlias, PconsMetadataTest, TargetType } from './metadata';
 
-export interface LegacyTargetShape {
-    name: string;
-    fullname: string;
-    output: string;
-    srcPath: string;
-    buildPath: string;
-    executable: boolean;
-    type: TargetType;
-    env?: Environment;
-}
+// re-export TargetType
+export { TargetType } from './metadata';
 
-// Target is a runtime proxy that wraps either raw metadata objects
-// (`PconsMetadataTarget` / `PconsMetadataAlias` / `PconsMetadataTest`)
-// or the legacy normalized shape. It exposes normalized helpers used
-// throughout the extension (fullname, output, buildPath, executable).
+// Target is a runtime proxy that wraps raw metadata objects
+// (`PconsMetadataTarget` / `PconsMetadataAlias` / `PconsMetadataTest`).
+// It exposes normalized helpers used throughout the extension
+// (fullname, output, buildPath, executable).
 export class Target {
-    private readonly metadata?: PconsMetadataTarget | PconsMetadataAlias | PconsMetadataTest;
+    private readonly metadata: PconsMetadataTarget | PconsMetadataAlias | PconsMetadataTest;
 
     public readonly name: string;
     public readonly fullname: string;
-    public readonly output: string;
+    public readonly output: string | undefined;
     public readonly srcPath: string;
     public readonly buildPath: string;
     public readonly executable: boolean;
     public readonly type: TargetType;
     public readonly env?: Environment;
 
-    constructor(obj: PconsMetadataTarget | PconsMetadataAlias | PconsMetadataTest | LegacyTargetShape, projectRoot?: string, buildDir?: string) {
-        // If the caller passed a normalized shape, just copy fields.
-        if ((obj as LegacyTargetShape).fullname !== undefined && (obj as LegacyTargetShape).output !== undefined) {
-            const s = obj as LegacyTargetShape;
-            this.metadata = undefined;
-            this.name = s.name;
-            this.fullname = s.fullname;
-            this.output = s.output;
-            this.srcPath = s.srcPath;
-            this.buildPath = s.buildPath;
-            this.executable = s.executable;
-            this.type = s.type;
-            this.env = s.env;
-            return;
-        }
-
-        // Otherwise assume it's one of the metadata shapes and store it.
-        this.metadata = obj as PconsMetadataTarget | PconsMetadataAlias | PconsMetadataTest;
+    constructor(obj: PconsMetadataTarget | PconsMetadataAlias | PconsMetadataTest, projectRoot?: string, buildDir?: string) {
+        this.metadata = obj;
 
         // Alias objects
-        if ((this.metadata as PconsMetadataAlias).entries !== undefined) {
-            const a = this.metadata as PconsMetadataAlias;
+        if ((obj as PconsMetadataAlias).entries !== undefined) {
+            const a = obj as PconsMetadataAlias;
             this.name = a.name;
             this.fullname = a.name;
             this.output = "";
@@ -68,23 +38,23 @@ export class Target {
         }
 
         // Metadata target
-        const mt = this.metadata as PconsMetadataTarget;
+        const mt = obj as PconsMetadataTarget;
         if (mt.outputs !== undefined) {
             const mainOutput = pickMainOutput(mt);
             const buildTargetName = stripBuildDirPrefix(mainOutput, buildDir ?? "");
 
             this.name = mt.name;
             this.fullname = buildTargetName.length > 0 ? buildTargetName : mt.name;
-            this.output = mainOutput.length > 0 && projectRoot ? require('path').resolve(projectRoot, mainOutput) : "";
+            this.output = mainOutput.length > 0 && projectRoot ? require('path').resolve(projectRoot, mainOutput) : undefined;
             this.srcPath = mt.sources.length > 0 && projectRoot ? require('path').resolve(projectRoot, require('path').dirname(mt.sources[0])) : (projectRoot ?? "");
-            this.buildPath = this.output.length > 0 ? require('path').dirname(this.output) : (projectRoot ?? "");
+            this.buildPath = this.output ? require('path').dirname(this.output) : (projectRoot ?? "");
             this.executable = mt.type === TargetType.Program && mainOutput.length > 0;
             this.type = mt.type as TargetType;
             return;
         }
 
         // Fallback for test objects or unknown shapes
-        const tt = this.metadata as PconsMetadataTest;
+        const tt = obj as PconsMetadataTest;
         this.name = tt.name ?? "";
         this.fullname = tt.name ?? "";
         this.output = "";
@@ -95,10 +65,10 @@ export class Target {
     }
 
     public get dependencies(): string[] {
-        if (!this.metadata || !('dependencies' in this.metadata)) {
+        if (!('dependencies' in this.metadata)) {
             return [];
         }
-        return (this.metadata as PconsMetadataTarget).dependencies ?? [];
+        return this.metadata.dependencies;
     }
 
     public getUnderlyingMetadata(): PconsMetadataTarget | PconsMetadataAlias | PconsMetadataTest | undefined {
@@ -111,7 +81,7 @@ function pickMainOutput(target: PconsMetadataTarget): string {
         return "";
     }
 
-    if (target.type !== "program") {
+    if (target.type !== TargetType.Program) {
         return target.outputs[0];
     }
 

@@ -1,6 +1,12 @@
 import { promises as fsPromises } from "fs";
 import * as path from "path";
-import { TargetType } from "./targets";
+
+export enum TargetType {
+    Program = "program",
+    Library = "library",
+    Test = "test",
+    Alias = "alias",
+}
 
 export interface TargetDefinitionLocation {
     file: string;

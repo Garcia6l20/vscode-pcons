@@ -77,11 +77,14 @@ function createDebuggerEnv(debuggerPath: string, target: Target): DebuggerEnviro
         paths.push(...process.env.PATH.split(path.delimiter));
     }
     return [
-        {name: 'PATH', value: paths.join(path.delimiter)},
+        { name: 'PATH', value: paths.join(path.delimiter) },
     ];
 }
 
 async function createGDBDebugConfiguration(debuggerPath: string, target: Target): Promise<VSCodeDebugConfiguration> {
+    if (!target.executable || !target.output) {
+        throw Error(`Cannot create GDB debug configuration for "${target.name}, not an executable"`);
+    }
     return {
         type: 'cppdbg',
         name: `Debug ${target.name}`,
@@ -103,6 +106,9 @@ async function createGDBDebugConfiguration(debuggerPath: string, target: Target)
 }
 
 async function createLLDBDebugConfiguration(debuggerPath: string, target: Target): Promise<VSCodeDebugConfiguration> {
+    if (!target.executable || !target.output) {
+        throw Error(`Cannot create LLDB debug configuration for "${target.name}, not an executable"`);
+    }
     return {
         type: 'cppdbg',
         name: `Debug ${target.name}`,
@@ -117,6 +123,9 @@ async function createLLDBDebugConfiguration(debuggerPath: string, target: Target
 }
 
 function createMsvcDebugConfiguration(target: Target): VSCodeDebugConfiguration {
+    if (!target.executable || !target.output) {
+        throw Error(`Cannot create MSVC debug configuration for "${target.name}, not an executable"`);
+    }
     return {
         type: 'cppvsdbg',
         name: `Debug ${target.name}`,
@@ -127,7 +136,7 @@ function createMsvcDebugConfiguration(target: Target): VSCodeDebugConfiguration 
     };
 }
 
-export async function debug(target: Target, args: string[] = []) {    
+export async function debug(target: Target, args: string[] = []) {
     let debuggerPath = undefined;
     if (gExtension !== null) {
         debuggerPath = await gExtension.debuggerPath();
@@ -144,7 +153,7 @@ export async function debug(target: Target, args: string[] = []) {
     if (!target.executable) {
         throw Error(`Cannot debug "${target.name}, not an executable"`);
     }
-    let debugConfig : VSCodeDebugConfiguration | null = null;
+    let debugConfig: VSCodeDebugConfiguration | null = null;
     if (debuggerPath?.includes('gdb')) {
         debugConfig = await createGDBDebugConfiguration(debuggerPath, target);
     } else if (debuggerPath?.includes('llvm')) {
