@@ -159,7 +159,58 @@ export async function getTests(ext: Pcons): Promise<string[]> {
 }
 
 export async function getTestSuites(ext: Pcons): Promise<TestSuiteInfo> {
-    return codeCommand<TestSuiteInfo>(ext, 'get-test-suites');
+    // Prefer metadata when available so Test Explorer can use the
+    // pre-generated metadata JSON instead of invoking the code interface.
+    const metadata = await readMetadata(ext.buildPath);
+    if (!metadata) {
+        return codeCommand<TestSuiteInfo>(ext, 'get-test-suites');
+    }
+
+    const root: TestSuiteInfo = {
+        id: `pcons:${metadata.project.name}`,
+        label: metadata.project.name,
+        type: 'suite',
+        children: [],
+    };
+
+    for (const t of metadata.targets) {
+        if ((t as any).test === undefined) {
+            continue;
+        }
+
+        const targetObj = metadataTargetToTarget(t, ext.projectRoot, metadata.project.build_dir);
+        const spec: any = (t as any).test;
+
+        const testId = `${targetObj.fullname}:${spec.name}`;
+        const testInfo: TestInfo = {
+            id: testId,
+            label: spec.name,
+            type: 'test',
+            file: path.resolve(ext.projectRoot, t.defined_at.file),
+            line: t.defined_at.line,
+            target: targetObj.fullname,
+            workingDirectory: spec.cwd ? path.resolve(ext.projectRoot, spec.cwd) : ext.buildPath,
+            args: spec.command && Array.isArray(spec.command) ? spec.command.slice(1) : [],
+            out: path.join(ext.buildPath, `${testId}.out`),
+            err: path.join(ext.buildPath, `${testId}.err`),
+        };
+
+        // Group tests per-target under a suite
+        const existing = root.children.find((c) => c.type === 'suite' && (c as TestSuiteInfo).id === `target:${targetObj.fullname}`) as TestSuiteInfo | undefined;
+        if (existing) {
+            existing.children.push(testInfo);
+        } else {
+            const suite: TestSuiteInfo = {
+                id: `target:${targetObj.fullname}`,
+                label: targetObj.fullname,
+                type: 'suite',
+                children: [testInfo],
+            };
+            root.children.push(suite);
+        }
+    }
+
+    return root;
 }
 
 export async function generate(ext: Pcons, debug = false) {

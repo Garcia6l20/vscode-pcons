@@ -15,6 +15,22 @@ export interface PconsMetadataTarget {
     sources: string[];
     outputs: string[];
     defined_at: TargetDefinitionLocation;
+    test?: PconsMetadataTest;
+}
+
+export interface PconsMetadataTest {
+    name: string;
+    command: string[];
+    cwd: string | null;
+    env: Record<string, string>;
+    labels: string[];
+    timeout: number | null;
+    should_fail: boolean;
+    serial: boolean;
+    disabled: boolean;
+    data: string[];
+    depends_on: string[];
+    defined_at: string;
 }
 
 export interface PconsMetadataAlias {
@@ -44,6 +60,56 @@ function isStringArray(value: unknown): value is string[] {
     return Array.isArray(value) && value.every((entry) => typeof entry === "string");
 }
 
+function isStringRecord(value: unknown): value is Record<string, string> {
+    if (!isRecord(value)) {
+        return false;
+    }
+    return Object.values(value).every((v) => typeof v === "string");
+}
+
+function isPconsMetadataTest(value: unknown): value is PconsMetadataTest {
+    if (!isRecord(value)) {
+        return false;
+    }
+    if (typeof value.name !== "string") {
+        return false;
+    }
+    if (!Array.isArray(value.command) || !value.command.every((c: unknown) => typeof c === "string")) {
+        return false;
+    }
+    if (!(typeof value.cwd === "string" || value.cwd === null)) {
+        return false;
+    }
+    if (!isStringRecord(value.env)) {
+        return false;
+    }
+    if (!isStringArray(value.labels)) {
+        return false;
+    }
+    if (!(typeof value.timeout === "number" || value.timeout === null)) {
+        return false;
+    }
+    if (typeof value.should_fail !== "boolean") {
+        return false;
+    }
+    if (typeof value.serial !== "boolean") {
+        return false;
+    }
+    if (typeof value.disabled !== "boolean") {
+        return false;
+    }
+    if (!isStringArray(value.data)) {
+        return false;
+    }
+    if (!isStringArray(value.depends_on)) {
+        return false;
+    }
+    if (typeof value.defined_at !== "string") {
+        return false;
+    }
+    return true;
+}
+
 function isTargetDefinitionLocation(value: unknown): value is TargetDefinitionLocation {
     if (!isRecord(value)) {
         return false;
@@ -69,13 +135,23 @@ function isPconsMetadataTarget(value: unknown): value is PconsMetadataTarget {
         return false;
     }
 
-    return typeof value.name === "string"
+    const base = typeof value.name === "string"
         && typeof value.type === "string"
         && typeof value.is_default === "boolean"
         && isStringArray(value.dependencies)
         && isStringArray(value.sources)
         && isStringArray(value.outputs)
         && isTargetDefinitionLocation(value.defined_at);
+
+    if (!base) {
+        return false;
+    }
+
+    if (value.test !== undefined) {
+        return isPconsMetadataTest(value.test);
+    }
+
+    return true;
 }
 
 function isPconsMetadataAlias(value: unknown): value is PconsMetadataAlias {

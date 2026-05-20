@@ -20,7 +20,7 @@ import { Log } from "vscode-test-adapter-util";
 import { Pcons } from "../extension";
 import { Target } from "./targets";
 import { existsSync as fileExists } from 'fs';
-import { Stream } from "./run";
+import { Stream, getOutputChannel } from "./run";
 
 export interface TestSuiteInfo extends APITestSuiteInfo {
     children: (TestSuiteInfo | TestInfo)[];
@@ -118,9 +118,20 @@ export class pconsTestAdapter implements TestAdapter {
     }
 
     private runnintTests: Stream[] = [];
+    private escapeRegex(s: string): string {
+        return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
     async runTest(test: TestInfo): Promise<void> {
         this.testStatesEmitter.fire(<TestEvent>{ type: "test", test: test.id, state: "running" });
-        const stream = new Stream('python', ['-m', 'pcons', 'test', '-B', this.ext.buildPath, '-q', test.id], {
+        // Use the test runner module directly and pass the manifest and a
+        // regex that matches the test's name (label). Avoid unsupported
+        // flags like -B/-q which the test runner doesn't accept.
+        const manifestPath = path.join(this.ext.buildPath, 'tests.json');
+        const nameRegex = `^${this.escapeRegex(test.label ?? '')}$`;
+        const channel = getOutputChannel();
+        channel.appendLine(`Running test ${test.id} with command: python -m pcons.test_runner --manifest ${manifestPath} -R ${nameRegex} -j 1`);
+        const stream = new Stream('python', ['-m', 'pcons.test_runner', '--manifest', manifestPath, '-R', nameRegex, '-j', '1'], {
             cwd: this.ext.projectRoot,
         });
         let killed = false;
@@ -128,6 +139,7 @@ export class pconsTestAdapter implements TestAdapter {
         let out: string = '';
         stream.onLine((line, isError) => {
             out += line;
+            channel.appendLine(line);
         });
         let res = await stream.finished();
         const index = this.runnintTests.indexOf(stream);

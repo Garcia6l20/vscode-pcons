@@ -62,7 +62,7 @@ export class Stream {
 }
 
 let _channel: vscode.LogOutputChannel;
-function getOutputChannel(): vscode.LogOutputChannel {
+export function getOutputChannel(): vscode.LogOutputChannel {
     if (!_channel) {
         _channel = vscode.window.createOutputChannel("pcons", { log: true });
     }

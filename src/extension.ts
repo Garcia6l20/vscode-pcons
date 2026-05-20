@@ -584,8 +584,7 @@ export class Pcons implements vscode.Disposable {
 			vscode.window.showErrorMessage(e.toString());
 		}
 
-		// TODO: Test Explorer integration (pconsTestAdapter) is kept for future work.
-		// await this.initTestExplorer();
+		await this.initTestExplorer();
 	}
 };
 
