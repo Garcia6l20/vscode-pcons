@@ -46,13 +46,11 @@ export class PconsCodeLensProvider implements vscode.CodeLensProvider, vscode.Di
         }
 
         const normalizedDoc = path.normalize(document.uri.fsPath);
-        const lenses: vscode.CodeLens[] = [];
+
+        type RawTarget = ReturnType<typeof this.ext.buildInfo.rawTargets>[number];
+        const byLine = new Map<number, RawTarget[]>();
 
         for (const target of this.ext.buildInfo.rawTargets()) {
-            const targetSelector = target.outputs.length > 0
-                ? target.outputs[0]
-                : target.name;
-
             const filePath = target.defined_at.file;
             const absoluteFile = path.isAbsolute(filePath)
                 ? filePath
@@ -63,40 +61,55 @@ export class PconsCodeLensProvider implements vscode.CodeLensProvider, vscode.Di
             }
 
             const line = Math.max(target.defined_at.line - 1, 0);
+            const group = byLine.get(line);
+            if (group) {
+                group.push(target);
+            } else {
+                byLine.set(line, [target]);
+            }
+        }
+
+        const lenses: vscode.CodeLens[] = [];
+
+        for (const [line, targets] of byLine) {
             const range = new vscode.Range(line, 0, line, 0);
+            const selectors = targets.map(t => t.outputs.length > 0 ? t.outputs[0] : t.name);
+            const programSelectors = targets
+                .filter(t => t.type === "program")
+                .map(t => t.outputs.length > 0 ? t.outputs[0] : t.name);
 
             lenses.push(new vscode.CodeLens(range, {
                 title: "Build",
                 command: "pcons.buildTarget",
-                arguments: [targetSelector],
+                arguments: [selectors],
             }));
 
-            if (target.type === "program") {
+            if (programSelectors.length > 0) {
                 lenses.push(new vscode.CodeLens(range, {
                     title: "Run",
                     command: "pcons.runTarget",
-                    arguments: [targetSelector],
+                    arguments: [programSelectors],
                 }));
 
                 if (this.advancedMode) {
                     lenses.push(new vscode.CodeLens(range, {
                         title: "Run with args",
                         command: "pcons.runTargetWithArgs",
-                        arguments: [targetSelector],
+                        arguments: [programSelectors],
                     }));
                 }
 
                 lenses.push(new vscode.CodeLens(range, {
                     title: "Debug",
                     command: "pcons.debugTarget",
-                    arguments: [targetSelector],
+                    arguments: [programSelectors],
                 }));
 
                 if (this.advancedMode) {
                     lenses.push(new vscode.CodeLens(range, {
                         title: "Debug with args",
                         command: "pcons.debugTargetWithArgs",
-                        arguments: [targetSelector],
+                        arguments: [programSelectors],
                     }));
                 }
             }

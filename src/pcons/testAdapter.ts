@@ -254,25 +254,23 @@ export class pconsTestAdapter implements TestAdapter {
         this.log.info(`Running tests ${JSON.stringify(tests)}`);
 
         this.testStatesEmitter.fire(<TestRunStartedEvent>{ type: 'started', tests });
-        await commands.build(this.ext, this.getTargets(tests), false);
-        let promises: Promise<void>[] = [];
-        for (const test of tests) {
-            const info = this.getInfo(test);
-            if (info === undefined) {
-                throw Error(`Cannot find infos of test ${test}`);
-            }
-            if (info.type === 'test') {
-                promises.push(this.runTest(info));
-            } else {
-                promises.push(this.runSuite(info));
-            }
-        }
         try {
+            await commands.build(this.ext, this.getTargets(tests), false);
+            const promises: Promise<void>[] = [];
+            for (const test of tests) {
+                const info = this.getInfo(test);
+                if (info === undefined) {
+                    throw Error(`Cannot find infos of test ${test}`);
+                }
+                if (info.type === 'test') {
+                    promises.push(this.runTest(info));
+                } else {
+                    promises.push(this.runSuite(info));
+                }
+            }
             await Promise.all(promises);
+        } finally {
             this.testStatesEmitter.fire(<TestRunFinishedEvent>{ type: 'finished' });
-        } catch (err) {
-            this.testStatesEmitter.fire(<TestRunFinishedEvent>{ type: 'finished' });
-            throw err;
         }
     }
     async debug(tests: string[]): Promise<void> {

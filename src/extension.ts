@@ -180,6 +180,29 @@ export class Pcons implements vscode.Disposable {
 		this._codeLensProvider.refresh();
 	}
 
+	private async promptOneOf(names: string[]): Promise<string | undefined> {
+		if (names.length === 1) { return names[0]; }
+		return vscode.window.showQuickPick(names, { placeHolder: 'Select target' });
+	}
+
+	private async promptAnyOf(names: string[]): Promise<string[] | undefined> {
+		if (names.length === 1) { return names; }
+		const pick = vscode.window.createQuickPick();
+		pick.canSelectMany = true;
+		pick.items = names.map(n => ({ label: n }));
+		pick.selectedItems = pick.items;
+		return new Promise(resolve => {
+			let selected: string[] | undefined;
+			pick.onDidAccept(() => {
+				const s = pick.selectedItems.map(i => i.label);
+				selected = s.length > 0 ? s : undefined;
+				pick.hide();
+			});
+			pick.onDidHide(() => { pick.dispose(); resolve(selected); });
+			pick.show();
+		});
+	}
+
 	private findTarget(name: string): Target | undefined {
 		const normalizedName = name.replace(/\\/g, '/').replace(/^\.\//, '');
 		const buildDirName = path.basename(this.buildPath).replace(/\\/g, '/');
@@ -202,26 +225,34 @@ export class Pcons implements vscode.Disposable {
 		}
 	}
 
-	async buildTarget(name: string) {
+	async buildTarget(nameOrNames: string | string[]) {
 		await this.ensureGenerated();
 		await this.ensureTargetsLoaded();
-		const target = this.findTarget(name);
-		if (target === undefined) {
-			throw new Error(`Target not found: ${name}`);
-		}
-		let targets = [];
-		if (target.type === TargetType.Test) {
-			targets = target.dependencies.map(dep => this.findTarget(dep)).filter((t): t is Target => t !== undefined);
-		} else {
-			targets.push(target);
+		const names = Array.isArray(nameOrNames) ? nameOrNames : [nameOrNames];
+		const selected = await this.promptAnyOf(names);
+		if (!selected) { return; }
+		const targets: Target[] = [];
+		for (const name of selected) {
+			const target = this.findTarget(name);
+			if (target === undefined) {
+				throw new Error(`Target not found: ${name}`);
+			}
+			if (target.type === TargetType.Test) {
+				targets.push(...target.dependencies.map(dep => this.findTarget(dep)).filter((t): t is Target => t !== undefined));
+			} else {
+				targets.push(target);
+			}
 		}
 		await commands.build(this, targets);
 		this.notifyUpdated();
 	}
 
-	async runTarget(name: string) {
+	async runTarget(nameOrNames: string | string[]) {
 		await this.ensureGenerated();
 		await this.ensureTargetsLoaded();
+		const names = Array.isArray(nameOrNames) ? nameOrNames : [nameOrNames];
+		const name = await this.promptOneOf(names);
+		if (!name) { return; }
 		const target = this.findTarget(name);
 		if (target === undefined) {
 			throw new Error(`Target not found: ${name}`);
@@ -235,9 +266,12 @@ export class Pcons implements vscode.Disposable {
 		await commands.run(this);
 	}
 
-	async runTargetWithArgs(name: string) {
+	async runTargetWithArgs(nameOrNames: string | string[]) {
 		await this.ensureGenerated();
 		await this.ensureTargetsLoaded();
+		const names = Array.isArray(nameOrNames) ? nameOrNames : [nameOrNames];
+		const name = await this.promptOneOf(names);
+		if (!name) { return; }
 		const target = this.findTarget(name);
 		if (target === undefined) {
 			throw new Error(`Target not found: ${name}`);
@@ -253,9 +287,12 @@ export class Pcons implements vscode.Disposable {
 		await commands.run(this, args);
 	}
 
-	async debugTarget(name: string) {
+	async debugTarget(nameOrNames: string | string[]) {
 		await this.ensureGenerated();
 		await this.ensureTargetsLoaded();
+		const names = Array.isArray(nameOrNames) ? nameOrNames : [nameOrNames];
+		const name = await this.promptOneOf(names);
+		if (!name) { return; }
 		const target = this.findTarget(name);
 		if (target === undefined) {
 			throw new Error(`Target not found: ${name}`);
@@ -270,9 +307,12 @@ export class Pcons implements vscode.Disposable {
 		await debuggerModule.debug(this.launchTarget, args);
 	}
 
-	async debugTargetWithArgs(name: string) {
+	async debugTargetWithArgs(nameOrNames: string | string[]) {
 		await this.ensureGenerated();
 		await this.ensureTargetsLoaded();
+		const names = Array.isArray(nameOrNames) ? nameOrNames : [nameOrNames];
+		const name = await this.promptOneOf(names);
+		if (!name) { return; }
 		const target = this.findTarget(name);
 		if (target === undefined) {
 			throw new Error(`Target not found: ${name}`);
