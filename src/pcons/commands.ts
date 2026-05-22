@@ -5,7 +5,7 @@ import { Pcons } from "../extension";
 import { isTarget, Target } from "./targets";
 import { TestSuiteInfo, TestInfo } from "./testAdapter";
 import { DebuggerEnvironmentVariable } from "./debugger";
-import { PconsMetadataAlias, PconsMetadataTarget, readMetadata } from "./metadata";
+import { PconsMetadata, PconsMetadataAlias, PconsMetadataTarget, readMetadata } from "./metadata";
 
 // export async function scanToolchains(ext: pcons) {
 //     return channelExec('scan-toolchains', getLogArgs());
@@ -61,6 +61,17 @@ export async function getTests(ext: Pcons): Promise<string[]> {
     return tests;
 }
 
+function resolveBuildPath(depName: string, metadata: PconsMetadata): string | undefined {
+    const t = metadata.targets.find((m: PconsMetadataTarget) => m.name === depName);
+    if (!t || t.outputs.length === 0) {
+        return undefined;
+    }
+    const buildDir = metadata.project.build_dir.replace(/\\/g, '/').replace(/^\.\//, '').replace(/\/+$/, '');
+    const raw = t.outputs[0].replace(/\\/g, '/').replace(/^\.\//, '');
+    const prefix = buildDir + '/';
+    return raw.startsWith(prefix) ? raw.substring(prefix.length) : raw;
+}
+
 export async function getTestSuites(ext: Pcons): Promise<TestSuiteInfo> {
     const metadata = await readMetadata(ext.buildPath);
     if (!metadata) {
@@ -98,7 +109,9 @@ export async function getTestSuites(ext: Pcons): Promise<TestSuiteInfo> {
             args: spec.command && Array.isArray(spec.command) ? spec.command.slice(1) : [],
             program: program,
             debuggable: program !== undefined,
-            dependencies: t.dependencies,
+            dependencies: t.dependencies
+                .map(dep => resolveBuildPath(dep, metadata))
+                .filter((d): d is string => d !== undefined),
             out: path.join(ext.buildPath, `${testId}.out`),
             err: path.join(ext.buildPath, `${testId}.err`),
         };

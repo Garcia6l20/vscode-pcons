@@ -529,7 +529,43 @@ export class Pcons implements vscode.Disposable {
 
 	async test() {
 		await this.ensureGenerated();
+		await this.ensureTargetsLoaded();
+		await this.buildForTest();
 		await commands.test(this);
+	}
+
+	private async buildForTest() {
+		const metadata = await readMetadata(this.buildPath);
+		if (!metadata) {
+			return;
+		}
+
+		const testTargetNames = this.tests.length > 0
+			? [...new Set(this.tests.map(id => id.substring(0, id.indexOf(':'))))]
+			: metadata.targets.filter(t => t.type === TargetType.Test).map(t => t.name);
+
+		const depNames = new Set<string>(
+			testTargetNames.flatMap(name => {
+				const t = metadata.targets.find(m => m.name === name);
+				return t?.dependencies ?? [];
+			})
+		);
+
+		const buildPaths: string[] = [];
+		const buildDir = metadata.project.build_dir;
+		for (const dep of depNames) {
+			const t = metadata.targets.find(m => m.name === dep);
+			if (!t || t.outputs.length === 0) {
+				continue;
+			}
+			const raw = t.outputs[0].replace(/\\/g, '/').replace(/^\.\//, '');
+			const prefix = buildDir.replace(/\\/g, '/').replace(/^\.\//, '').replace(/\/+$/, '') + '/';
+			buildPaths.push(raw.startsWith(prefix) ? raw.substring(prefix.length) : raw);
+		}
+
+		if (buildPaths.length > 0) {
+			await commands.build(this, buildPaths);
+		}
 	}
 
 	async executableArguments(target?: string) {
