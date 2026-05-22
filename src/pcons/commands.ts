@@ -5,11 +5,7 @@ import { Pcons } from "../extension";
 import { isTarget, Target } from "./targets";
 import { TestSuiteInfo, TestInfo } from "./testAdapter";
 import { DebuggerEnvironmentVariable } from "./debugger";
-import { PconsMetadata, PconsMetadataAlias, PconsMetadataTarget, readMetadata } from "./metadata";
-
-// export async function scanToolchains(ext: pcons) {
-//     return channelExec('scan-toolchains', getLogArgs());
-// }
+import { PconsMetadataAlias, PconsMetadataTarget, readMetadata, allAliases, rootProject, resolveBuildPath } from "./metadata";
 
 export async function getTargets(ext: Pcons): Promise<Target[]> {
     const metadata = await readMetadata(ext.buildPath);
@@ -17,13 +13,13 @@ export async function getTargets(ext: Pcons): Promise<Target[]> {
         throw new Error(`pcons metadata not found in ${ext.buildPath}`);
     }
 
-    const targets = metadata.targets.map((target) =>
-        metadataTargetToTarget(target, ext.projectRoot, metadata.project.build_dir)
+    const targets = metadata.projects.flatMap(project =>
+        project.targets.map(target => metadataTargetToTarget(target, ext.projectRoot, project.build_dir))
     );
-    const targetNames = new Set(targets.map((target) => target.fullname));
-    const aliases = metadata.aliases
-        .filter((alias) => !targetNames.has(alias.name))
-        .map((alias) => metadataAliasToTarget(alias, ext.projectRoot));
+    const targetNames = new Set(targets.map(target => target.fullname));
+    const aliases = allAliases(metadata)
+        .filter(alias => !targetNames.has(alias.name))
+        .map(alias => metadataAliasToTarget(alias, ext.projectRoot));
 
     return [...targets, ...aliases];
 }
@@ -48,28 +44,15 @@ export async function getTests(ext: Pcons): Promise<string[]> {
     }
 
     const tests: string[] = [];
-    for (const t of metadata.targets) {
-        if ((t as any).test === undefined) {
-            continue;
+    for (const project of metadata.projects) {
+        for (const t of project.targets) {
+            if (t.test === undefined) { continue; }
+            const targetObj = metadataTargetToTarget(t, ext.projectRoot, project.build_dir);
+            tests.push(`${targetObj.fullname}:${t.test.name}`);
         }
-        const targetObj = metadataTargetToTarget(t, ext.projectRoot, metadata.project.build_dir);
-        const spec: any = (t as any).test;
-        const testId = `${targetObj.fullname}:${spec.name}`;
-        tests.push(testId);
     }
     tests.sort();
     return tests;
-}
-
-function resolveBuildPath(depName: string, metadata: PconsMetadata): string | undefined {
-    const t = metadata.targets.find((m: PconsMetadataTarget) => m.name === depName);
-    if (!t || t.outputs.length === 0) {
-        return undefined;
-    }
-    const buildDir = metadata.project.build_dir.replace(/\\/g, '/').replace(/^\.\//, '').replace(/\/+$/, '');
-    const raw = t.outputs[0].replace(/\\/g, '/').replace(/^\.\//, '');
-    const prefix = buildDir + '/';
-    return raw.startsWith(prefix) ? raw.substring(prefix.length) : raw;
 }
 
 export async function getTestSuites(ext: Pcons): Promise<TestSuiteInfo> {
@@ -79,55 +62,52 @@ export async function getTestSuites(ext: Pcons): Promise<TestSuiteInfo> {
     }
 
     const root: TestSuiteInfo = {
-        id: `pcons:${metadata.project.name}`,
-        label: metadata.project.name,
+        id: `pcons:${rootProject(metadata).name}`,
+        label: rootProject(metadata).name,
         type: 'suite',
         children: [],
     };
 
-    for (const t of metadata.targets) {
-        if ((t as any).test === undefined) {
-            continue;
-        }
+    for (const project of metadata.projects) {
+        for (const t of project.targets) {
+            if (t.test === undefined) { continue; }
 
-        const targetObj = metadataTargetToTarget(t, ext.projectRoot, metadata.project.build_dir);
-        const spec: any = (t as any).test;
+            const targetObj = metadataTargetToTarget(t, ext.projectRoot, project.build_dir);
+            const spec = t.test;
+            const testId = `${targetObj.fullname}:${spec.name}`;
+            const program = spec.command.length > 0 ? spec.command[0] : undefined;
 
-        const testId = `${targetObj.fullname}:${spec.name}`;
-        const program = spec.command && spec.command.length > 0
-            ? spec.command[0]
-            : undefined;
-
-        const testInfo: TestInfo = {
-            id: testId,
-            label: spec.name,
-            type: 'test',
-            file: path.resolve(ext.projectRoot, t.defined_at.file),
-            line: t.defined_at.line - 1, // Convert to 0-based line number
-            target: targetObj.fullname,
-            workingDirectory: spec.cwd ? path.resolve(ext.projectRoot, spec.cwd) : ext.buildPath,
-            args: spec.command && Array.isArray(spec.command) ? spec.command.slice(1) : [],
-            program: program,
-            debuggable: program !== undefined,
-            dependencies: t.dependencies
-                .map(dep => resolveBuildPath(dep, metadata))
-                .filter((d): d is string => d !== undefined),
-            out: path.join(ext.buildPath, `${testId}.out`),
-            err: path.join(ext.buildPath, `${testId}.err`),
-        };
-
-        // Group tests per-target under a suite
-        const existing = root.children.find((c) => c.type === 'suite' && (c as TestSuiteInfo).id === `target:${targetObj.fullname}`) as TestSuiteInfo | undefined;
-        if (existing) {
-            existing.children.push(testInfo);
-        } else {
-            const suite: TestSuiteInfo = {
-                id: `target:${targetObj.fullname}`,
-                label: targetObj.fullname,
-                type: 'suite',
-                children: [testInfo],
+            const testInfo: TestInfo = {
+                id: testId,
+                label: spec.name,
+                type: 'test',
+                file: path.resolve(ext.projectRoot, t.defined_at.file),
+                line: t.defined_at.line - 1,
+                target: targetObj.fullname,
+                workingDirectory: spec.cwd ? path.resolve(ext.projectRoot, spec.cwd) : ext.buildPath,
+                args: spec.command.slice(1),
+                program: program,
+                debuggable: program !== undefined,
+                dependencies: t.dependencies
+                    .map(dep => resolveBuildPath(dep, metadata))
+                    .filter((d): d is string => d !== undefined),
+                out: path.join(ext.buildPath, `${testId}.out`),
+                err: path.join(ext.buildPath, `${testId}.err`),
             };
-            root.children.push(suite);
+
+            const existing = root.children.find(
+                c => c.type === 'suite' && (c as TestSuiteInfo).id === `target:${targetObj.fullname}`
+            ) as TestSuiteInfo | undefined;
+            if (existing) {
+                existing.children.push(testInfo);
+            } else {
+                root.children.push({
+                    id: `target:${targetObj.fullname}`,
+                    label: targetObj.fullname,
+                    type: 'suite',
+                    children: [testInfo],
+                });
+            }
         }
     }
 

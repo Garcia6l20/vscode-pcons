@@ -16,6 +16,8 @@ export interface TargetDefinitionLocation {
 
 export interface PconsMetadataTarget {
     name: string;
+    qualified_name: string;
+    sub_directory: string;
     type: TargetType;
     is_default: boolean;
     dependencies: string[];
@@ -47,16 +49,29 @@ export interface PconsMetadataAlias {
 
 export interface PconsProjectMetadata {
     name: string;
+    parent: string | null;
     root_dir: string;
     build_dir: string;
+    targets: PconsMetadataTarget[];
+    aliases: PconsMetadataAlias[];
 }
 
 export interface PconsMetadata {
     schema_version: number;
     generator: string;
-    project: PconsProjectMetadata;
-    targets: PconsMetadataTarget[];
-    aliases: PconsMetadataAlias[];
+    projects: PconsProjectMetadata[];
+}
+
+export function rootProject(metadata: PconsMetadata): PconsProjectMetadata {
+    return metadata.projects.find(p => p.parent === null) ?? metadata.projects[0];
+}
+
+export function allTargets(metadata: PconsMetadata): PconsMetadataTarget[] {
+    return metadata.projects.flatMap(p => p.targets);
+}
+
+export function allAliases(metadata: PconsMetadata): PconsMetadataAlias[] {
+    return metadata.projects.flatMap(p => p.aliases);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -121,19 +136,15 @@ function isTargetDefinitionLocation(value: unknown): value is TargetDefinitionLo
     if (!isRecord(value)) {
         return false;
     }
-
     if (typeof value.file !== "string") {
         return false;
     }
-
     if (typeof value.line !== "number") {
         return false;
     }
-
     if (value.function !== undefined && typeof value.function !== "string") {
         return false;
     }
-
     return true;
 }
 
@@ -141,23 +152,21 @@ function isPconsMetadataTarget(value: unknown): value is PconsMetadataTarget {
     if (!isRecord(value)) {
         return false;
     }
-
     const base = typeof value.name === "string"
+        && typeof value.qualified_name === "string"
+        && typeof value.sub_directory === "string"
         && typeof value.type === "string"
         && typeof value.is_default === "boolean"
         && isStringArray(value.dependencies)
         && isStringArray(value.sources)
         && isStringArray(value.outputs)
         && isTargetDefinitionLocation(value.defined_at);
-
     if (!base) {
         return false;
     }
-
     if (value.test !== undefined) {
         return isPconsMetadataTest(value.test);
     }
-
     return true;
 }
 
@@ -165,7 +174,6 @@ function isPconsMetadataAlias(value: unknown): value is PconsMetadataAlias {
     if (!isRecord(value)) {
         return false;
     }
-
     return typeof value.name === "string"
         && isStringArray(value.entries);
 }
@@ -174,24 +182,24 @@ function isPconsProjectMetadata(value: unknown): value is PconsProjectMetadata {
     if (!isRecord(value)) {
         return false;
     }
-
     return typeof value.name === "string"
+        && (value.parent === null || typeof value.parent === "string")
         && typeof value.root_dir === "string"
-        && typeof value.build_dir === "string";
+        && typeof value.build_dir === "string"
+        && Array.isArray(value.targets)
+        && value.targets.every(isPconsMetadataTarget)
+        && Array.isArray(value.aliases)
+        && value.aliases.every(isPconsMetadataAlias);
 }
 
 export function isPconsMetadata(value: unknown): value is PconsMetadata {
     if (!isRecord(value)) {
         return false;
     }
-
     return typeof value.schema_version === "number"
         && typeof value.generator === "string"
-        && isPconsProjectMetadata(value.project)
-        && Array.isArray(value.targets)
-        && value.targets.every(isPconsMetadataTarget)
-        && Array.isArray(value.aliases)
-        && value.aliases.every(isPconsMetadataAlias);
+        && Array.isArray(value.projects)
+        && value.projects.every(isPconsProjectMetadata);
 }
 
 export function metadataFilePath(buildPath: string, fileName: string = "pcons_metadata.json"): string {
@@ -200,6 +208,12 @@ export function metadataFilePath(buildPath: string, fileName: string = "pcons_me
 
 export function parseMetadata(data: string): PconsMetadata {
     const parsed: unknown = JSON.parse(data);
+    if (!isRecord(parsed) || typeof parsed.schema_version !== "number") {
+        throw new Error("Invalid pcons metadata: missing schema_version");
+    }
+    if (parsed.schema_version < 2) {
+        throw new Error(`pcons metadata schema version ${parsed.schema_version} is not supported. Please regenerate with pcons ≥ 0.19.`);
+    }
     if (!isPconsMetadata(parsed)) {
         throw new Error("Invalid pcons metadata payload");
     }
@@ -211,7 +225,6 @@ export async function readMetadata(
     fileName: string = "pcons_metadata.json"
 ): Promise<PconsMetadata | undefined> {
     const filePath = metadataFilePath(buildPath, fileName);
-
     try {
         const data = await fsPromises.readFile(filePath, "utf8");
         return parseMetadata(data);
@@ -228,5 +241,17 @@ export function findMetadataTarget(
     metadata: PconsMetadata,
     targetName: string
 ): PconsMetadataTarget | undefined {
-    return metadata.targets.find((target) => target.name === targetName);
+    return allTargets(metadata).find((target) => target.name === targetName);
+}
+
+export function resolveBuildPath(depName: string, metadata: PconsMetadata): string | undefined {
+    for (const project of metadata.projects) {
+        const t = project.targets.find(m => m.name === depName);
+        if (!t || t.outputs.length === 0) { continue; }
+        const buildDir = project.build_dir.replace(/\\/g, '/').replace(/^\.\//, '').replace(/\/+$/, '');
+        const raw = t.outputs[0].replace(/\\/g, '/').replace(/^\.\//, '');
+        const prefix = buildDir + '/';
+        return raw.startsWith(prefix) ? raw.substring(prefix.length) : raw;
+    }
+    return undefined;
 }
