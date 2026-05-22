@@ -177,6 +177,15 @@ export class Pcons implements vscode.Disposable {
 			}
 		}
 
+		if (this.tests.length > 0) {
+			const availableTests = new Set(this.buildInfo.tests());
+			const validTests = this.tests.filter(t => availableTests.has(t));
+			if (validTests.length !== this.tests.length) {
+				this.tests = validTests;
+				this.testsChanged.fire(this.tests);
+			}
+		}
+
 		this._codeLensProvider.refresh();
 	}
 
