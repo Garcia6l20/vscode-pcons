@@ -138,46 +138,54 @@ export class BuildInfo {
             children: [],
         };
 
+        // Collect all test specs first so we can compute prefix groups.
+        type TestEntry = { target: Target; raw: PconsMetadataTarget; spec: PconsMetadataTest };
+        const entries: TestEntry[] = [];
         for (const project of this._raw.projects) {
             for (const t of project.targets) {
                 if (t.test === undefined) { continue; }
+                entries.push({ target: new Target(t, this.projectRoot, project.build_dir), raw: t, spec: t.test });
+            }
+        }
 
-                const targetObj = new Target(t, this.projectRoot, project.build_dir);
-                const spec = t.test;
-                const testId = `${targetObj.fullname}:${spec.name}`;
-                const program = spec.command.length > 0 ? spec.command[0] : undefined;
+        const specNames = entries.map(e => e.spec.name);
 
-                const testInfo: TestInfo = {
-                    id: testId,
-                    label: spec.name,
-                    type: 'test',
-                    file: path.resolve(this.projectRoot, t.defined_at.file),
-                    line: t.defined_at.line - 1,
-                    target: targetObj.fullname,
-                    workingDirectory: spec.cwd ? path.resolve(this.projectRoot, spec.cwd) : this._buildPath,
-                    args: spec.command.slice(1),
-                    program: program,
-                    debuggable: program !== undefined,
-                    dependencies: t.dependencies
-                        .map(dep => this.resolveBuildPath(dep))
-                        .filter((d): d is string => d !== undefined),
-                    out: path.join(this._buildPath, `${testId}.out`),
-                    err: path.join(this._buildPath, `${testId}.err`),
-                };
+        for (const { target: targetObj, raw: t, spec } of entries) {
+            const testId = `${targetObj.fullname}:${spec.name}`;
+            const { group, suffix } = computeTestGroup(spec.name, specNames);
+            const program = spec.command.length > 0 ? spec.command[0] : undefined;
 
-                const existing = root.children.find(
-                    c => c.type === 'suite' && (c as TestSuiteInfo).id === `target:${targetObj.fullname}`
-                ) as TestSuiteInfo | undefined;
-                if (existing) {
-                    existing.children.push(testInfo);
-                } else {
-                    root.children.push({
-                        id: `target:${targetObj.fullname}`,
-                        label: targetObj.fullname,
-                        type: 'suite',
-                        children: [testInfo],
-                    });
-                }
+            const testInfo: TestInfo = {
+                id: testId,
+                label: suffix,
+                testName: spec.name,
+                type: 'test',
+                file: path.resolve(this.projectRoot, t.defined_at.file),
+                line: t.defined_at.line - 1,
+                target: targetObj.fullname,
+                workingDirectory: spec.cwd ? path.resolve(this.projectRoot, spec.cwd) : this._buildPath,
+                args: spec.command.slice(1),
+                program: program,
+                debuggable: program !== undefined,
+                dependencies: t.dependencies
+                    .map(dep => this.resolveBuildPath(dep))
+                    .filter((d): d is string => d !== undefined),
+                out: path.join(this._buildPath, `${testId}.out`),
+                err: path.join(this._buildPath, `${testId}.err`),
+            };
+
+            const existing = root.children.find(
+                c => c.type === 'suite' && c.id === `group:${group}`
+            ) as TestSuiteInfo | undefined;
+            if (existing) {
+                existing.children.push(testInfo);
+            } else {
+                root.children.push({
+                    id: `group:${group}`,
+                    label: group,
+                    type: 'suite',
+                    children: [testInfo],
+                });
             }
         }
 
@@ -188,6 +196,30 @@ export class BuildInfo {
     buildScriptFiles(): Set<string> {
         return buildScriptFiles(this.projectRoot, this._raw);
     }
+}
+
+function longestCommonPrefix(a: string, b: string): string {
+    let i = 0;
+    while (i < a.length && i < b.length && a[i] === b[i]) { i++; }
+    return a.slice(0, i);
+}
+
+function computeTestGroup(name: string, allNames: string[]): { group: string; suffix: string } {
+    let bestGroup = '';
+    for (const other of allNames) {
+        if (other === name) { continue; }
+        const lcp = longestCommonPrefix(name, other);
+        const dashIdx = lcp.lastIndexOf('-');
+        const snapped = dashIdx >= 0 ? lcp.slice(0, dashIdx) : '';
+        if (snapped.length > bestGroup.length) { bestGroup = snapped; }
+    }
+    if (bestGroup) {
+        return { group: bestGroup, suffix: name.slice(bestGroup.length + 1) };
+    }
+    const lastDash = name.lastIndexOf('-');
+    return lastDash >= 0
+        ? { group: name.slice(0, lastDash), suffix: name.slice(lastDash + 1) }
+        : { group: name, suffix: name };
 }
 
 function buildScriptFiles(projectRoot: string, raw: PconsMetadata | undefined): Set<string> {
