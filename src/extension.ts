@@ -5,14 +5,12 @@ import * as commands from './pcons/commands';
 import * as debuggerModule from './pcons/debugger';
 import { PconsCodeLensProvider } from './pcons/codelens';
 import * as path from 'path';
-import { promises as fsPromises } from 'fs';
-import { Target, TargetType } from './pcons/targets';
+import { Target, TargetType, BuildInfo } from './pcons/targets';
 import { StatusBar } from './status';
 import { pconsTestAdapter } from './pcons/testAdapter';
 import { TestHub, testExplorerExtensionId } from 'vscode-test-adapter-api';
 import { Log, TestAdapterRegistrar } from 'vscode-test-adapter-util';
 import { str2cmdline } from './pcons/run';
-import { PconsMetadata, metadataFilePath, readMetadata } from './pcons/metadata';
 
 class TargetPickItem {
 	label: string;
@@ -39,6 +37,7 @@ export class Pcons implements vscode.Disposable {
 	tests: string[] = [];
 	testsChanged = new vscode.EventEmitter<string[]>();
 	buildDiagnostics: vscode.DiagnosticCollection;
+	readonly buildInfo: BuildInfo;
     private readonly _codeLensProvider: PconsCodeLensProvider;
 	private _needsGenerate = true;
 	private _buildScriptWatchers: vscode.Disposable[] = [];
@@ -56,6 +55,7 @@ export class Pcons implements vscode.Disposable {
 			throw new Error('Cannot resolve project root');
 		}
 		this.targets = [];
+		this.buildInfo = new BuildInfo(this.projectRoot);
 		this._codeLensProvider = new PconsCodeLensProvider(this);
 		extensionContext.subscriptions.push(this._codeLensProvider);
 		extensionContext.subscriptions.push(vscode.languages.registerCodeLensProvider(
@@ -139,56 +139,10 @@ export class Pcons implements vscode.Disposable {
 		this._buildScriptWatchers = [];
 	}
 
-	private async readMetadataIfUpToDate(): Promise<PconsMetadata | undefined> {
-		const metaPath = metadataFilePath(this.buildPath);
-		let metaStat: import('fs').Stats;
-		try {
-			metaStat = await fsPromises.stat(metaPath);
-		} catch {
-			return undefined;
-		}
-
-		let metadata: PconsMetadata | undefined;
-		try {
-			metadata = await readMetadata(this.buildPath);
-		} catch {
-			return undefined;
-		}
-		if (!metadata) {
-			return undefined;
-		}
-
-		const filesToCheck = new Set<string>();
-		filesToCheck.add(path.join(this.projectRoot, 'pcons-build.py'));
-		for (const target of metadata.targets) {
-			filesToCheck.add(path.resolve(this.projectRoot, target.defined_at.file));
-		}
-
-		for (const filePath of filesToCheck) {
-			try {
-				const stat = await fsPromises.stat(filePath);
-				if (stat.mtimeMs > metaStat.mtimeMs) {
-					return undefined;
-				}
-			} catch {
-				// file doesn't exist, skip
-			}
-		}
-
-		return metadata;
-	}
-
-	private setupBuildScriptWatchers(metadata: PconsMetadata) {
+	private setupBuildScriptWatchers() {
 		this._buildScriptWatchers.forEach(w => w.dispose());
 		this._buildScriptWatchers = [];
-
-		const filesToWatch = new Set<string>();
-		filesToWatch.add(path.join(this.projectRoot, 'pcons-build.py'));
-		for (const target of metadata.targets) {
-			filesToWatch.add(path.resolve(this.projectRoot, target.defined_at.file));
-		}
-
-		for (const filePath of filesToWatch) {
+		for (const filePath of this.buildInfo.buildScriptFiles()) {
 			const watcher = vscode.workspace.createFileSystemWatcher(filePath);
 			const invalidate = () => { this._needsGenerate = true; };
 			watcher.onDidChange(invalidate);
@@ -203,7 +157,7 @@ export class Pcons implements vscode.Disposable {
 	}
 
 	async refreshTargets() {
-		this.targets = await commands.getTargets(this);
+		this.targets = this.buildInfo.targets();
 
 		const executableTargets = this.targets.filter((target) => target.executable);
 		const launchStillValid = this.launchTarget !== undefined
@@ -359,7 +313,7 @@ export class Pcons implements vscode.Disposable {
 	}
 
 	async promptLaunchTarget(fireEvent: boolean = true) {
-		let targets = this.targets = await commands.getTargets(this);
+		let targets = this.targets = this.buildInfo.targets();
 		// Only programs are valid launch targets
 		targets = targets.filter(t => t.executable === true && t.type === 'program');
 		targets.sort((l, r) => l.fullname < r.fullname ? -1 : 1);
@@ -372,7 +326,7 @@ export class Pcons implements vscode.Disposable {
 	}
 
 	async promptBuildTargets() {
-		let targets = this.targets = await commands.getTargets(this);
+		let targets = this.targets = this.buildInfo.targets();
 		// Exclude test-type targets from build target selection
 		targets = targets.filter(t => t.type !== 'test');
 		targets.sort((l, r) => l.fullname < r.fullname ? -1 : 1);
@@ -406,7 +360,7 @@ export class Pcons implements vscode.Disposable {
 	}
 
 	async promptTests() {
-		let tests = this.tests = await commands.getTests(this);
+		let tests = this.tests = this.buildInfo.tests();
 		class TestPick {
 			constructor(public label: string) { }
 		};
@@ -440,10 +394,9 @@ export class Pcons implements vscode.Disposable {
 		if (!this._needsGenerate) {
 			return;
 		}
-		const upToDate = await this.readMetadataIfUpToDate();
-		if (upToDate) {
+		if (await this.buildInfo.tryLoadFresh(this.buildPath)) {
 			this._needsGenerate = false;
-			this.setupBuildScriptWatchers(upToDate);
+			this.setupBuildScriptWatchers();
 			if (this.targets.length === 0) {
 				await this.refreshTargets();
 			}
@@ -465,13 +418,9 @@ export class Pcons implements vscode.Disposable {
 	async generate(debug = false) {
 		await commands.generate(this, debug);
 		this._needsGenerate = false;
+		await this.buildInfo.load(this.buildPath);
 		await this.refreshTargets();
-
-		const metadata = await readMetadata(this.buildPath);
-		if (metadata) {
-			this.setupBuildScriptWatchers(metadata);
-		}
-
+		this.setupBuildScriptWatchers();
 		this.notifyUpdated();
 		this.extensionContext.environmentVariableCollection.replace('PCONS_BUILD_DIR', this.buildPath);
 		this.extensionContext.environmentVariableCollection.replace('PCONS_SOURCE_DIR', this.projectRoot);
@@ -535,33 +484,20 @@ export class Pcons implements vscode.Disposable {
 	}
 
 	private async buildForTest() {
-		const metadata = await readMetadata(this.buildPath);
-		if (!metadata) {
-			return;
-		}
+		if (!this.buildInfo.isLoaded) { return; }
 
+		const rawTargets = this.buildInfo.rawTargets();
 		const testTargetNames = this.tests.length > 0
 			? [...new Set(this.tests.map(id => id.substring(0, id.indexOf(':'))))]
-			: metadata.targets.filter(t => t.type === TargetType.Test).map(t => t.name);
+			: rawTargets.filter(t => t.type === TargetType.Test).map(t => t.name);
 
 		const depNames = new Set<string>(
-			testTargetNames.flatMap(name => {
-				const t = metadata.targets.find(m => m.name === name);
-				return t?.dependencies ?? [];
-			})
+			testTargetNames.flatMap(name => rawTargets.find(m => m.name === name)?.dependencies ?? [])
 		);
 
-		const buildPaths: string[] = [];
-		const buildDir = metadata.project.build_dir;
-		for (const dep of depNames) {
-			const t = metadata.targets.find(m => m.name === dep);
-			if (!t || t.outputs.length === 0) {
-				continue;
-			}
-			const raw = t.outputs[0].replace(/\\/g, '/').replace(/^\.\//, '');
-			const prefix = buildDir.replace(/\\/g, '/').replace(/^\.\//, '').replace(/\/+$/, '') + '/';
-			buildPaths.push(raw.startsWith(prefix) ? raw.substring(prefix.length) : raw);
-		}
+		const buildPaths = [...depNames]
+			.map(dep => this.buildInfo.resolveBuildPath(dep))
+			.filter((p): p is string => p !== undefined);
 
 		if (buildPaths.length > 0) {
 			await commands.build(this, buildPaths);

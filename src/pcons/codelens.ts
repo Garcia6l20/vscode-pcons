@@ -1,7 +1,6 @@
 import * as path from "path";
 import * as vscode from "vscode";
 import { Pcons } from "../extension";
-import { readMetadata } from "./metadata";
 
 export class PconsCodeLensProvider implements vscode.CodeLensProvider, vscode.Disposable {
     private readonly changeEmitter = new vscode.EventEmitter<void>();
@@ -42,15 +41,14 @@ export class PconsCodeLensProvider implements vscode.CodeLensProvider, vscode.Di
     }
 
     async provideCodeLenses(document: vscode.TextDocument): Promise<vscode.CodeLens[]> {
-        const metadata = await readMetadata(this.ext.buildPath);
-        if (metadata === undefined) {
+        if (!this.ext.buildInfo.isLoaded) {
             return [];
         }
 
         const normalizedDoc = path.normalize(document.uri.fsPath);
         const lenses: vscode.CodeLens[] = [];
 
-        for (const target of metadata.targets) {
+        for (const target of this.ext.buildInfo.rawTargets()) {
             const targetSelector = target.outputs.length > 0
                 ? target.outputs[0]
                 : target.name;

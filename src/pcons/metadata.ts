@@ -62,18 +62,6 @@ export interface PconsMetadata {
     projects: PconsProjectMetadata[];
 }
 
-export function rootProject(metadata: PconsMetadata): PconsProjectMetadata {
-    return metadata.projects.find(p => p.parent === null) ?? metadata.projects[0];
-}
-
-export function allTargets(metadata: PconsMetadata): PconsMetadataTarget[] {
-    return metadata.projects.flatMap(p => p.targets);
-}
-
-export function allAliases(metadata: PconsMetadata): PconsMetadataAlias[] {
-    return metadata.projects.flatMap(p => p.aliases);
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null;
 }
@@ -237,21 +225,3 @@ export async function readMetadata(
     }
 }
 
-export function findMetadataTarget(
-    metadata: PconsMetadata,
-    targetName: string
-): PconsMetadataTarget | undefined {
-    return allTargets(metadata).find((target) => target.name === targetName);
-}
-
-export function resolveBuildPath(depName: string, metadata: PconsMetadata): string | undefined {
-    for (const project of metadata.projects) {
-        const t = project.targets.find(m => m.name === depName);
-        if (!t || t.outputs.length === 0) { continue; }
-        const buildDir = project.build_dir.replace(/\\/g, '/').replace(/^\.\//, '').replace(/\/+$/, '');
-        const raw = t.outputs[0].replace(/\\/g, '/').replace(/^\.\//, '');
-        const prefix = buildDir + '/';
-        return raw.startsWith(prefix) ? raw.substring(prefix.length) : raw;
-    }
-    return undefined;
-}

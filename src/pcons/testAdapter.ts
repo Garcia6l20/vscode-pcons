@@ -84,7 +84,7 @@ export class pconsTestAdapter implements TestAdapter {
         this.testsEmitter.fire(<TestLoadStartedEvent>{ type: 'started' });
 
         try {
-            this.root = await commands.getTestSuites(this.ext);
+            this.root = this.ext.buildInfo.getTestSuites();
             this.testsEmitter.fire(<TestLoadFinishedEvent>{
                 type: 'finished',
                 suite: this.root,
