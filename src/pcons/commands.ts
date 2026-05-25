@@ -1,9 +1,24 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import { channelExec, execInTerminal, getLogArgs } from "./run";
+import { BuildOutputConsumer } from "./buildOutput";
 import { Pcons } from "../extension";
 import { isTarget, Target } from "./targets";
 import { DebuggerEnvironmentVariable } from "./debugger";
+
+// Matches compiler output lines that start with a file path (must contain '/')
+// followed by ':' and either a line number or a space (GCC "In function" context lines).
+const _filePathExpr = /^([^:\s\n][^:]*\/[^:]*):(?=\d|\s)/;
+
+function makeLineResolver(base: string): (line: string) => string {
+    return (line: string) => {
+        const m = _filePathExpr.exec(line);
+        if (m && !path.isAbsolute(m[1])) {
+            return path.resolve(base, m[1]) + line.slice(m[1].length);
+        }
+        return line;
+    };
+}
 
 export async function generate(ext: Pcons, debug = false) {
     let args = ['-B', ext.buildPath, '-b', `${ext.projectRoot}/pcons-build.py`];
@@ -72,7 +87,16 @@ export async function build(ext: Pcons, targets: Target[] | string[] = [], debug
     if (debug) {
         await debugExec(ext, ['build', ...args]);
     } else {
-        await channelExec('build', [...args], undefined, true, ext.projectRoot, ext.buildDiagnostics);
+        const buildPath = ext.buildPath;
+        const consumer = new BuildOutputConsumer(buildPath);
+        const resolveLine = makeLineResolver(buildPath);
+        ext.buildDiagnostics.clear();
+        try {
+            await channelExec('build', [...args], undefined, true, ext.projectRoot,
+                line => consumer.feedLine(line), resolveLine);
+        } finally {
+            consumer.resolveToCollection(ext.buildDiagnostics);
+        }
     }
 }
 

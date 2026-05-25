@@ -84,20 +84,6 @@ export function getLogArgs(): string[] {
     }
 }
 
-export function handleDiagnostics(line: string, diagnostics: vscode.DiagnosticCollection | undefined): boolean {
-    if (diagnostics !== undefined) {
-        const diagmatch = /DIAGNOSTICS: (.+)$/g.exec(line.trim());
-        if (diagmatch) {
-            const data = JSON.parse(diagmatch[1]);
-            for (const fname in data) {
-                const diag = data[fname];
-                diagnostics.set(vscode.Uri.file(fname), diag);
-            }
-            return true;
-        }
-    }
-    return false;
-}
 
 class ProgressBar implements vscode.Disposable {
     private bar;
@@ -189,7 +175,7 @@ class LogStream implements vscode.Disposable {
     static readonly _expr = /\[([\d:.]+)\]\[(\w+)\]\s*(.+?):\s*(.+)?/;
     static readonly _progressExpr = /(.+) - (.+)\/(.+)/;
     static readonly _sequenceExpr = /\x1b\[./;
-    
+
     public bars = new ProgressSet();
 
     constructor(readonly output: vscode.LogOutputChannel) {
@@ -253,7 +239,8 @@ export async function channelExec(command: string,
     title: string | undefined = undefined,
     cancellable: boolean = true,
     cwd: string | undefined = undefined,
-    diagnostics: vscode.DiagnosticCollection | undefined = undefined) {
+    onBuildLine?: (line: string) => void,
+    lineTransform?: (line: string) => string) {
     let stream = new Stream('python', ['-u', '-m', 'pcons', command, ...parameters], { cwd: cwd });
     title = title ?? `Executing ${command} ${parameters.join(' ')}`;
     const channel = getOutputChannel();
@@ -261,14 +248,13 @@ export async function channelExec(command: string,
     channel.show();
     channel.info(title);
     channel.trace('command args:', ...parameters);
-    diagnostics?.clear();
     const logStream = new LogStream(channel);
     logStream.bars.get('make', true);
     logStream.bars.onCancellationRequested(() => stream.kill());
-    stream.onLine((line: string, isError) => {
-        if (!handleDiagnostics(line, diagnostics)) {
-            logStream.processLine(line);
-        }
+    stream.onLine((line: string) => {
+        const resolved = lineTransform ? lineTransform(line) : line;
+        onBuildLine?.(resolved);
+        logStream.processLine(resolved);
     });
     const rc = await stream.finished();
     const statusStr = rc === 0 ? 'succeed' : 'failed';

@@ -1,7 +1,21 @@
 const esbuild = require("esbuild");
+const path = require("path");
 
 const production = process.argv.includes('--production');
 const watch = process.argv.includes('--watch');
+
+const cmtAliasPlugin = {
+	name: 'cmt-alias',
+	setup(build) {
+		build.onResolve({ filter: /^@cmt\/diagnostics\// }, args => {
+			const rest = args.path.slice('@cmt/diagnostics/'.length);
+			return { path: path.resolve(__dirname, `deps/cmake-tools/src/diagnostics/${rest}.ts`) };
+		});
+		build.onResolve({ filter: /^@cmt\/util$/ }, args => {
+			return { path: path.resolve(__dirname, 'src/shims/cmt-util.ts') };
+		});
+	},
+};
 
 /**
  * @type {import('esbuild').Plugin}
@@ -38,7 +52,7 @@ async function main() {
 		external: ['vscode'],
 		logLevel: 'silent',
 		plugins: [
-			/* add to the end of plugins array */
+			cmtAliasPlugin,
 			esbuildProblemMatcherPlugin,
 		],
 	});
