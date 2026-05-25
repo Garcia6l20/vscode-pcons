@@ -1,6 +1,14 @@
 # pcons VS Code Extension
 
-VS Code support for projects built with pcons.
+<p align="center">
+  <img src="images/icon.png" alt="pcons logo" width="128"/>
+</p>
+
+VS Code support for projects built with [pcons](https://pcons.org/), a Python-based build system inspired by SCons and CMake.
+
+- [Website](https://pcons.org/)
+- [Documentation](https://pcons.readthedocs.io/en/latest/)
+- [pcons on GitHub](https://github.com/DarkStarSystems/pcons)
 
 The extension activates automatically when the workspace contains a pcons-build.py file.
 
