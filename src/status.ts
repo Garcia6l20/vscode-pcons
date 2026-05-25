@@ -151,17 +151,6 @@ class DebugButton extends Button {
     }
 }
 
-class TestButton extends Button {
-    settingsName = 'test';
-    constructor(ext: Pcons, protected readonly priority: number) {
-        super(priority);
-        this.command = 'pcons.test';
-        this.icon = 'beaker';
-        this.text = 'Test';
-        this.tooltip = 'Test the selected target(s) in the terminal window';
-    }
-}
-
 class SelectLaunchTargetButton extends Button {
     constructor(ext: Pcons, protected readonly priority: number) {
         super(priority);
@@ -207,38 +196,17 @@ class SelectBuildTargetsButton extends Button {
     }
 }
 
-class SelectTestTargetsButton extends Button {
-    constructor(ext: Pcons, protected readonly priority: number) {
-        super(priority);
-        this.command = 'pcons.selectTestTargets';
-        this.text = 'test all';
-        this.tooltip = 'Select test(s)';
-        ext.testsChanged.event((tests: string[]) => {
-            if (tests.length === 0) {
-                this.text = 'test all';
-            } else if(tests.length === 1) {
-                this.text = `test ${tests[0]}`;
-            } else {
-                this.text = 'test multiple';
-            }
-            this.update();
-        });
-    }
-}
-
 export class StatusBar implements vscode.Disposable {
 
   private readonly _buttons: Button[];
     constructor(ext: Pcons) {
         this._buttons = [
             new SelectVariantButton(ext, 0.95),
-        new SelectLaunchTargetButton(ext, 0.9),
-        new DebugButton(ext, 0.8),
-        new LaunchButton(ext, 0.7),
-        new SelectBuildTargetsButton(ext, 0.5),
-        new BuildButton(ext, 0.4),
-        new SelectTestTargetsButton(ext, 0.2),
-        new TestButton(ext, 0.1),
+            new SelectLaunchTargetButton(ext, 0.9),
+            new DebugButton(ext, 0.8),
+            new LaunchButton(ext, 0.7),
+            new SelectBuildTargetsButton(ext, 0.5),
+            new BuildButton(ext, 0.4),
     ];
     this.update();
   }
