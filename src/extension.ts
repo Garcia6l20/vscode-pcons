@@ -160,19 +160,21 @@ export class Pcons implements vscode.Disposable {
 		this.targets = this.buildInfo.targets();
 
 		const executableTargets = this.targets.filter((target) => target.executable);
-		const launchStillValid = this.launchTarget !== undefined
-			&& executableTargets.some((target) => this.sameTarget(target, this.launchTarget!));
-		if (!launchStillValid) {
-			this.launchTarget = executableTargets[0];
+		const resolvedLaunch = this.launchTarget !== undefined
+			? executableTargets.find(t => this.sameTarget(t, this.launchTarget!))
+			: executableTargets[0];
+		const newLaunchTarget = resolvedLaunch ?? executableTargets[0];
+		if (newLaunchTarget !== this.launchTarget) {
+			this.launchTarget = newLaunchTarget;
 			this.launchTargetChanged.fire(this.launchTarget);
 		}
 
 		if (this.buildTargets.length > 0) {
-			const validBuildTargets = this.buildTargets.filter((buildTarget) =>
-				this.targets.some((target) => this.sameTarget(target, buildTarget))
-			);
-			if (validBuildTargets.length !== this.buildTargets.length) {
-				this.buildTargets = validBuildTargets;
+			const resolved = this.buildTargets
+				.map(bt => this.targets.find(t => this.sameTarget(t, bt)))
+				.filter((t): t is Target => t !== undefined);
+			if (resolved.length !== this.buildTargets.length || resolved.some((t, i) => t !== this.buildTargets[i])) {
+				this.buildTargets = resolved;
 				this.buildTargetsChanged.fire(this.buildTargets);
 			}
 		}
