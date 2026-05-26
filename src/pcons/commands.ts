@@ -8,7 +8,7 @@ import { DebuggerEnvironmentVariable } from "./debugger";
 
 // Matches compiler output lines that start with a file path (must contain '/')
 // followed by ':' and either a line number or a space (GCC "In function" context lines).
-const _filePathExpr = /^([^:\s\n][^:]*\/[^:]*):(?=\d|\s)/;
+const _filePathExpr = /^([^\s:]+\/[^\s:]*):(?=\d|\s)/;
 
 function makeLineResolver(base: string): (line: string) => string {
     return (line: string) => {

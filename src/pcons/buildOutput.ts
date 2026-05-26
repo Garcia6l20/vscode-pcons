@@ -24,6 +24,11 @@ export class BuildOutputConsumer {
                 const severity = diagnosticSeverity(raw.severity);
                 if (severity === undefined) { continue; }
 
+                // Template instantiation context lines ("required from '...'") that the
+                // parser couldn't attach to a parent error appear as spurious standalone
+                // diagnostics with a malformed file path (e.g. "/file.hpp:108"). Drop them.
+                if (/^\s*required from /.test(raw.message)) { continue; }
+
                 const diag = new vscode.Diagnostic(raw.location, raw.message, severity);
                 diag.source = 'pcons';
                 if (raw.code) {
@@ -51,6 +56,8 @@ export class BuildOutputConsumer {
     }
 
     private absPath(file: string): string {
-        return path.isAbsolute(file) ? file : path.resolve(this.cwd, file);
+        // Strip trailing :line or :line:col suffixes that some parsers include in the file capture
+        const clean = file.replace(/(?::\d+)+$/, '');
+        return path.isAbsolute(clean) ? clean : path.resolve(this.cwd, clean);
     }
 }
