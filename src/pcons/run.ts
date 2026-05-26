@@ -61,20 +61,16 @@ export class Stream {
     }
 }
 
-let _channel: vscode.LogOutputChannel;
-export function getOutputChannel(): vscode.LogOutputChannel {
+let _channel: vscode.OutputChannel;
+export function getOutputChannel(): vscode.OutputChannel {
     if (!_channel) {
-        _channel = vscode.window.createOutputChannel("pcons", { log: true });
+        _channel = vscode.window.createOutputChannel("pcons");
     }
     return _channel;
 }
 
-function getLogLevel(): vscode.LogLevel {
-    return getOutputChannel().logLevel;
-}
-
 export function getLogArgs(): string[] {
-    switch (getLogLevel()) {
+    switch (vscode.env.logLevel) {
         case vscode.LogLevel.Trace:
             return ['-vv'];
         case vscode.LogLevel.Debug:
@@ -178,7 +174,7 @@ class LogStream implements vscode.Disposable {
 
     public bars = new ProgressSet();
 
-    constructor(readonly output: vscode.LogOutputChannel) {
+    constructor(readonly output: vscode.OutputChannel) {
     }
 
     dispose() {
@@ -186,18 +182,10 @@ class LogStream implements vscode.Disposable {
     }
 
     processLine(line: string) {
-        const [m, ts, level, id, msg] = LogStream._expr.exec(line) || [];
+        const [m, , level, id, msg] = LogStream._expr.exec(line) || [];
         if (m) {
-            let out = this.output.info;
             switch (level) {
-                case 'DEBUG':
-                    out = this.output.debug;
-                    break;
-                case 'WARNING':
-                    out = this.output.warn;
-                    break;
                 case 'STATUS':
-                    // this.bars.clear(id);
                     return;
                 case 'PROGRESS':
                     {
@@ -220,12 +208,8 @@ class LogStream implements vscode.Disposable {
                         }
                     }
                     return;
-                case 'ERROR':
-                case 'CRITICAL':
-                    out = this.output.error;
-                    break;
             }
-            out(`${id}: ${msg}`);
+            this.output.appendLine(`${id}: ${msg}`);
         } else {
             if (!LogStream._sequenceExpr.exec(line)) {
                 this.output.appendLine(line);
@@ -246,8 +230,7 @@ export async function channelExec(command: string,
     const channel = getOutputChannel();
     channel.clear();
     channel.show();
-    channel.info(title);
-    channel.trace('command args:', ...parameters);
+    channel.appendLine(title);
     const logStream = new LogStream(channel);
     logStream.bars.get('make', true);
     logStream.bars.onCancellationRequested(() => stream.kill());
@@ -260,12 +243,12 @@ export async function channelExec(command: string,
     const statusStr = rc === 0 ? 'succeed' : 'failed';
     logStream.dispose();
     if (rc !== 0) {
-        channel.error(`command: ${command} failed`);
+        channel.appendLine(`command: ${command} failed`);
         vscode.window.showErrorMessage(`pcons: ${command} ${statusStr}: see output log`);
         channel.show();
         throw Error(`command: ${command} failed`);
     } else {
-        channel.info(`command: ${command} succeed`);
+        channel.appendLine(`command: ${command} succeed`);
     }
 }
 
