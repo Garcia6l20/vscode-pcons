@@ -235,6 +235,7 @@
     "lint": "eslint src",
     "test": "vscode-test",
     "package": "vsce package",
+    "install:vsix": "vsce package -o pcons.vsix && code --install-extension pcons.vsix --force",
     "publish": "vsce publish",
     "update:vendored": "node scripts/update-vendored-diagnostics.mjs"
   },
