@@ -235,7 +235,8 @@
     "lint": "eslint src",
     "test": "vscode-test",
     "package": "vsce package",
-    "publish": "vsce publish"
+    "publish": "vsce publish",
+    "update:vendored": "node scripts/update-vendored-diagnostics.mjs"
   },
   "dependencies": {
     "vscode-cpptools": "^5.0.0",
