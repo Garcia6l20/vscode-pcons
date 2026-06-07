@@ -7,11 +7,7 @@
 		],
 		"sourceMap": true,
 		"skipLibCheck": true,
-		"strict": true,
-		"paths": {
-			"@cmt/diagnostics/*": ["./deps/cmake-tools/src/diagnostics/*"],
-			"@cmt/util": ["./src/shims/cmt-util"]
-		}
+		"strict": true
 	},
 	"include": [
 		"src/**/*.ts"

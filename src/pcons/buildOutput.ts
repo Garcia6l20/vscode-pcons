@@ -1,9 +1,9 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import * as gcc from '@cmt/diagnostics/gcc';
-import * as gnuLd from '@cmt/diagnostics/gnu-ld';
-import * as msvc from '@cmt/diagnostics/msvc';
-import { diagnosticSeverity } from '@cmt/diagnostics/util';
+import * as gcc from '../vendor/cmake-tools/diagnostics/gcc';
+import * as gnuLd from '../vendor/cmake-tools/diagnostics/gnu-ld';
+import * as msvc from '../vendor/cmake-tools/diagnostics/msvc';
+import { diagnosticSeverity } from '../vendor/cmake-tools/diagnostics/util';
 
 export class BuildOutputConsumer {
     private readonly parsers = [new gcc.Parser(), new gnuLd.Parser(), new msvc.Parser()];
