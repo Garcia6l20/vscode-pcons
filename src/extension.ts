@@ -393,7 +393,7 @@ export class Pcons implements vscode.Disposable {
 				if (pick.selectedItems.length === 0) {
 					rej();
 				} else {
-					if (pick.selectedItems.length === this.targets.length) {
+					if (pick.selectedItems.length === pick.items.length) {
 						res([]); // aka.: all
 					} else {
 						res(pick.selectedItems.map(pt => pt.target));
