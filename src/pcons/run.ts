@@ -85,6 +85,7 @@ class ProgressBar implements vscode.Disposable {
     private bar;
     private progress?: vscode.Progress<{ message?: string; increment?: number }>;
     private token?: vscode.CancellationToken;
+    private cancelCallbacks: Array<() => any> = [];
     private done: Promise<boolean>;
     private resolve?: ((value: boolean) => void);
     private reject?: (() => void);
@@ -105,6 +106,10 @@ class ProgressBar implements vscode.Disposable {
             async (progress, token) => {
                 this.progress = progress;
                 this.token = token;
+                for (const cb of this.cancelCallbacks) {
+                    token.onCancellationRequested(cb);
+                }
+                this.cancelCallbacks = [];
                 await this.done;
                 console.debug(`${this.id} terminated`);
             });
@@ -116,7 +121,11 @@ class ProgressBar implements vscode.Disposable {
     }
 
     public onCancellationRequested(callback: () => any) {
-        this.token?.onCancellationRequested(callback);
+        if (this.token) {
+            this.token.onCancellationRequested(callback);
+        } else {
+            this.cancelCallbacks.push(callback);
+        }
     }
 
     public report(percentage?: number, message?: string) {
