@@ -35,21 +35,13 @@ export async function generate(ext: Pcons, debug = false) {
     }
 
     args.push(...getLogArgs());
+    args.push('-G', 'ninja', '-G', 'metadata');
 
     if (debug) {
         await debugExec(ext, ['generate', ...args]);
     } else {
         await channelExec('generate', args, undefined, true, ext.projectRoot);
     }
-
-    const metadataArgs = [...args, '-G', 'metadata'];
-    await channelExec(
-        'generate',
-        metadataArgs,
-        'Generating pcons metadata',
-        true,
-        ext.projectRoot
-    );
 }
 
 function baseArgs(ext: Pcons): string[] {
