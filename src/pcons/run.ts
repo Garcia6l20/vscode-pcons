@@ -29,21 +29,44 @@ function processBuffer(data: any, isError: boolean, fn: (line: string, isError: 
 
 export class Stream {
     private proc: cp.ChildProcess;
+    private killed = false;
 
     constructor(command: string, args: string[], options: cp.SpawnOptions = {}) {
-        this.proc = cp.spawn(command, args, options);
+        // Run the child as its own process group leader (POSIX) so we can signal
+        // the whole tree on cancel. pcons spawns ninja, which spawns cc1plus;
+        // those grandchildren survive a kill aimed only at the direct child.
+        this.proc = cp.spawn(command, args, {
+            ...options,
+            detached: process.platform !== "win32",
+        });
     }
 
     onLine(fn: (line: string, isError: boolean) => void) {
         this.proc.stdout?.on("data", (chunk: any) => processBuffer(chunk, false, fn));
         this.proc.stderr?.on("data", (chunk: any) => processBuffer(chunk, true, fn));
     }
-    kill(signal?: NodeJS.Signals) {
-        this.proc.kill(signal || "SIGTERM");
+    kill(signal: NodeJS.Signals = "SIGTERM") {
+        this.killed = true;
+        const pid = this.proc.pid;
+        if (pid === undefined) {
+            return;
+        }
+        if (process.platform === "win32") {
+            // No POSIX process groups; let taskkill walk the tree.
+            cp.spawn("taskkill", ["/pid", String(pid), "/T", "/F"]);
+            return;
+        }
+        try {
+            // Negative pid targets the whole process group created via detached.
+            process.kill(-pid, signal);
+        } catch {
+            // Group already gone, or never created; fall back to the direct child.
+            this.proc.kill(signal);
+        }
     }
     private _onExit(code: number | null): number {
         if (code === null) {
-            if (this.proc.killed) {
+            if (this.killed || this.proc.killed) {
                 return -1;
             } else {
                 return 0;
