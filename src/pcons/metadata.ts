@@ -17,7 +17,7 @@ export interface TargetDefinitionLocation {
 export interface PconsMetadataTarget {
     name: string;
     qualified_name: string;
-    sub_directory: string;
+    sub_directory: string | null;
     type: TargetType;
     is_default: boolean;
     dependencies: string[];
@@ -142,7 +142,7 @@ function isPconsMetadataTarget(value: unknown): value is PconsMetadataTarget {
     }
     const base = typeof value.name === "string"
         && typeof value.qualified_name === "string"
-        && typeof value.sub_directory === "string"
+        && (typeof value.sub_directory === "string" || value.sub_directory === null)
         && typeof value.type === "string"
         && typeof value.is_default === "boolean"
         && isStringArray(value.dependencies)
