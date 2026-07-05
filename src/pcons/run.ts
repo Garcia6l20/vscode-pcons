@@ -293,6 +293,14 @@ function getTerminal(): vscode.Terminal {
     return terminal;
 }
 
+let runTerminal: vscode.Terminal | undefined;
+
+vscode.window.onDidCloseTerminal((terminal) => {
+    if (terminal === runTerminal) {
+        runTerminal = undefined;
+    }
+});
+
 export function execInTerminal(
     command: string,
     args: string[] = [],
@@ -300,11 +308,18 @@ export function execInTerminal(
     env: { [key: string]: string } | undefined = undefined,
     name: string = 'pcons'
 ) {
+    // Reuse a single run terminal slot: dispose the previous one and create a
+    // fresh terminal so cwd/env are always correct for the current target.
+    const old = runTerminal;
+    runTerminal = undefined;
+    old?.dispose();
+
     const terminal = vscode.window.createTerminal({
         name,
         cwd,
         env,
     });
+    runTerminal = terminal;
 
     terminal.show();
     terminal.sendText([command, ...args].map(quoteShellArg).join(' '), true);
