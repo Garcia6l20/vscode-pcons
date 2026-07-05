@@ -92,6 +92,7 @@ async function createGDBDebugConfiguration(debuggerPath: string, target: Target)
         cwd: target.buildPath,
         environment: createDebuggerEnv(debuggerPath, target),
         args: [],
+        console: ConsoleTypes.integratedTerminal,
         MIMode: MIModes.gdb,
         miDebuggerPath: debuggerPath,
         setupCommands: [
@@ -116,6 +117,7 @@ async function createLLDBDebugConfiguration(debuggerPath: string, target: Target
         cwd: target.buildPath,
         environment: createDebuggerEnv(debuggerPath, target),
         args: [],
+        console: ConsoleTypes.integratedTerminal,
         MIMode: MIModes.lldb,
         miDebuggerPath: debuggerPath,
         program: target.output,
@@ -132,6 +134,7 @@ function createMsvcDebugConfiguration(target: Target): VSCodeDebugConfiguration 
         request: 'launch',
         cwd: target.buildPath,
         args: [],
+        console: ConsoleTypes.integratedTerminal,
         program: target.output,
     };
 }
