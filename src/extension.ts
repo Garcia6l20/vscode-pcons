@@ -356,9 +356,20 @@ export class Pcons implements vscode.Disposable {
 			return;
 		}
 		const variant = await vscode.window.showQuickPick(variants);
-		if (variant) {
+		if (variant && variant !== this._variant) {
 			this._variant = variant;
 			this.variantChanged.fire(this._variant);
+			// buildPath depends on the variant, so the loaded metadata and
+			// resolved target paths point at the old variant. Invalidate and
+			// reload so run/debug/build use the new variant's build folder.
+			this.buildInfo.clear();
+			this.targets = [];
+			this._needsGenerate = true;
+			try {
+				await this.ensureGenerated();
+			} catch (e: any) {
+				vscode.window.showErrorMessage(e.toString());
+			}
 		}
 		return variant;
 	}
