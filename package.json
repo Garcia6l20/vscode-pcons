@@ -3,7 +3,7 @@
   "displayName": "pcons",
   "description": "pcons support for VSCode",
   "icon": "images/icon.png",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "repository": {
     "url": "https://github.com/Garcia6l20/vscode-pcons"
   },
