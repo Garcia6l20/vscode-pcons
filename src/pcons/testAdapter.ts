@@ -199,28 +199,6 @@ export class pconsTestAdapter implements TestAdapter {
         await Promise.all(promises);
     }
 
-    getSuiteTargets(suite: TestSuiteInfo) {
-        let targets: string[] = [];
-        for (const info of suite.children) {
-            if (info === undefined) {
-                throw Error(`Cannot find infos of test ${test}`);
-            }
-
-            if (info.type === 'test') {
-                targets.push(info.target);
-            } else {
-                for (const child of info.children) {
-                    if (child.type === 'test') {
-                        targets.push(child.target);
-                    } else {
-                        targets.push(...this.getSuiteTargets(child));
-                    }
-                }
-            }
-        }
-        return targets;
-    }
-
     getTargets(tests: string[]) {
         const targets: string[] = [];
         const seenTests = new Set<string>();

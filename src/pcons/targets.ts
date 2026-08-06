@@ -148,16 +148,15 @@ export class BuildInfo {
             }
         }
 
-        const specNames = entries.map(e => e.spec.name);
-
         for (const { target: targetObj, raw: t, spec } of entries) {
             const testId = `${targetObj.fullname}:${spec.name}`;
-            const { group, suffix } = computeTestGroup(spec.name, specNames);
+            const segments = spec.name.split('.');
+            const label = segments.pop() ?? spec.name;
             const program = spec.command.length > 0 ? spec.command[0] : undefined;
 
             const testInfo: TestInfo = {
                 id: testId,
-                label: suffix,
+                label: label,
                 testName: spec.name,
                 type: 'test',
                 file: path.resolve(this.projectRoot, t.defined_at.file),
@@ -174,19 +173,7 @@ export class BuildInfo {
                 err: path.join(this._buildPath, `${testId}.err`),
             };
 
-            const existing = root.children.find(
-                c => c.type === 'suite' && c.id === `group:${group}`
-            ) as TestSuiteInfo | undefined;
-            if (existing) {
-                existing.children.push(testInfo);
-            } else {
-                root.children.push({
-                    id: `group:${group}`,
-                    label: group,
-                    type: 'suite',
-                    children: [testInfo],
-                });
-            }
+            ensureSuite(root, segments).children.push(testInfo);
         }
 
         return root;
@@ -198,28 +185,24 @@ export class BuildInfo {
     }
 }
 
-function longestCommonPrefix(a: string, b: string): string {
-    let i = 0;
-    while (i < a.length && i < b.length && a[i] === b[i]) { i++; }
-    return a.slice(0, i);
-}
-
-function computeTestGroup(name: string, allNames: string[]): { group: string; suffix: string } {
-    let bestGroup = '';
-    for (const other of allNames) {
-        if (other === name) { continue; }
-        const lcp = longestCommonPrefix(name, other);
-        const dashIdx = lcp.lastIndexOf('-');
-        const snapped = dashIdx >= 0 ? lcp.slice(0, dashIdx) : '';
-        if (snapped.length > bestGroup.length) { bestGroup = snapped; }
+// Walks (creating as needed) the suite chain matching the dotted namespace of a
+// test name, e.g. "core.overload.ctor" -> root / core / overload.
+function ensureSuite(root: TestSuiteInfo, segments: string[]): TestSuiteInfo {
+    let parent = root;
+    let prefix = '';
+    for (const segment of segments) {
+        prefix = prefix ? `${prefix}.${segment}` : segment;
+        const id = `group:${prefix}`;
+        let suite = parent.children.find(
+            c => c.type === 'suite' && c.id === id
+        ) as TestSuiteInfo | undefined;
+        if (!suite) {
+            suite = { id, label: segment, type: 'suite', children: [] };
+            parent.children.push(suite);
+        }
+        parent = suite;
     }
-    if (bestGroup) {
-        return { group: bestGroup, suffix: name.slice(bestGroup.length + 1) };
-    }
-    const lastDash = name.lastIndexOf('-');
-    return lastDash >= 0
-        ? { group: name.slice(0, lastDash), suffix: name.slice(lastDash + 1) }
-        : { group: name, suffix: name };
+    return parent;
 }
 
 function buildScriptFiles(projectRoot: string, raw: PconsMetadata | undefined): Set<string> {
