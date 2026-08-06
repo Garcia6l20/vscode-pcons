@@ -158,6 +158,7 @@ export class BuildInfo {
                 id: testId,
                 label: label,
                 testName: spec.name,
+                discovered: spec.discover !== null,
                 type: 'test',
                 file: path.resolve(this.projectRoot, t.defined_at.file),
                 line: t.defined_at.line - 1,

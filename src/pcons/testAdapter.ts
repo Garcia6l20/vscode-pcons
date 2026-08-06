@@ -33,6 +33,9 @@ export interface TestInfo extends APITestInfo {
     /** The actual test name used for matching (may differ from the display label) */
     testName: string;
 
+    /** True when the runner expands this entry into one test per discovered case */
+    discovered: boolean;
+
     /** The working directory of the test */
     workingDirectory: string;
 
@@ -136,7 +139,11 @@ export class pconsTestAdapter implements TestAdapter {
         // flags like -B/-q which the test runner doesn't accept.
         const channel = getOutputChannel();
         const manifestPath = path.join(this.ext.buildPath, 'tests.json');
-        const nameRegex = `^${this.escapeRegex(test.testName)}$`;
+        // A discovered entry vanishes at run time: the runner replaces it with
+        // one `<name>.<case>` test per enumerated case, so match those too.
+        const nameRegex = test.discovered
+            ? `^${this.escapeRegex(test.testName)}($|\\.)`
+            : `^${this.escapeRegex(test.testName)}$`;
 
         channel.appendLine(`Running test ${test.id} with command: python -m pcons.test_runner --manifest ${manifestPath} -R ${nameRegex} -j 1`);
 

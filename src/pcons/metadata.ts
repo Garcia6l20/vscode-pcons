@@ -39,6 +39,8 @@ export interface PconsMetadataTest {
     disabled: boolean;
     data: string[];
     depends_on: string[];
+    /** Framework whose cases the runner enumerates ("doctest", "gtest", ...). */
+    discover: string | null;
     defined_at: string;
 }
 
@@ -112,6 +114,9 @@ function isPconsMetadataTest(value: unknown): value is PconsMetadataTest {
         return false;
     }
     if (!isStringArray(value.depends_on)) {
+        return false;
+    }
+    if (!(typeof value.discover === "string" || value.discover === null)) {
         return false;
     }
     if (typeof value.defined_at !== "string") {
