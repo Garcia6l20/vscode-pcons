@@ -301,7 +301,26 @@ vscode.window.onDidCloseTerminal((terminal) => {
     }
 });
 
-export function execInTerminal(
+function waitForShellIntegration(terminal: vscode.Terminal, timeoutMs: number): Promise<vscode.TerminalShellIntegration | undefined> {
+    if (terminal.shellIntegration) {
+        return Promise.resolve(terminal.shellIntegration);
+    }
+    return new Promise((resolve) => {
+        const timer = setTimeout(() => {
+            listener.dispose();
+            resolve(undefined);
+        }, timeoutMs);
+        const listener = vscode.window.onDidChangeTerminalShellIntegration((e) => {
+            if (e.terminal === terminal) {
+                clearTimeout(timer);
+                listener.dispose();
+                resolve(e.shellIntegration);
+            }
+        });
+    });
+}
+
+export async function execInTerminal(
     command: string,
     args: string[] = [],
     cwd: string | undefined = undefined,
@@ -322,7 +341,20 @@ export function execInTerminal(
     runTerminal = terminal;
 
     terminal.show();
-    terminal.sendText([command, ...args].map(quoteShellArg).join(' '), true);
+
+    const commandLine = [command, ...args].map(quoteShellArg).join(' ');
+    // Other extensions (python env activation) write to a fresh terminal while
+    // its shell is still starting, which garbles a command sent right away.
+    // Shell integration only reports ready once the prompt is idle.
+    const shellIntegration = await waitForShellIntegration(terminal, 5000);
+    if (terminal.exitStatus !== undefined) {
+        return;
+    }
+    if (shellIntegration) {
+        shellIntegration.executeCommand(commandLine);
+    } else {
+        terminal.sendText(commandLine, true);
+    }
 }
 
 

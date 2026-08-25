@@ -117,7 +117,7 @@ export async function run(ext: Pcons, args?: string[]) {
 
     const targetDirectory = path.dirname(target.output);
 
-    execInTerminal(
+    await execInTerminal(
         target.output,
         args ?? [],
         targetDirectory,
