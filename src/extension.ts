@@ -29,7 +29,7 @@ export class Pcons implements vscode.Disposable {
 	launchTarget: Target | undefined = undefined;
 	launchTargetArguments: StringMap = {};
 	_debugCommandArguments: string = "configure";
-	_variant: string = 'Debug';
+	_variant: string = 'debug';
 	variantChanged = new vscode.EventEmitter<string>();
 	launchTargetChanged = new vscode.EventEmitter<Target | undefined>();
 	buildTargets: Target[] = [];
@@ -92,7 +92,7 @@ export class Pcons implements vscode.Disposable {
 		this.launchTargetArguments = this.extensionContext.workspaceState.get<StringMap>('launchTargetArguments', this.launchTargetArguments);
 		this._debugCommandArguments = this.extensionContext.workspaceState.get<string>('debugCommandArguments', this._debugCommandArguments);
 
-		this._variant = this.extensionContext.workspaceState.get<string>('variant', 'Debug');
+		this._variant = this.extensionContext.workspaceState.get<string>('variant', 'debug');
 		this.variantChanged.fire(this._variant);
 		this.variantChanged.event((value: string) => {
 			this.extensionContext.workspaceState.update('variant', value);
