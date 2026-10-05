@@ -103,6 +103,43 @@ export function getLogArgs(): string[] {
     }
 }
 
+interface PythonEnvironmentsApi {
+    getActiveEnvironmentPath(resource?: vscode.Uri): { path: string };
+    resolveEnvironment(env: { path: string }): Promise<{ executable: { uri?: vscode.Uri } } | undefined>;
+}
+
+async function activePythonInterpreter(): Promise<string | undefined> {
+    const ext = vscode.extensions.getExtension<{ environments?: PythonEnvironmentsApi }>('ms-python.python');
+    if (!ext) {
+        return undefined;
+    }
+    const api = ext.isActive ? ext.exports : await ext.activate();
+    const envs = api?.environments;
+    if (!envs) {
+        return undefined;
+    }
+    const active = envs.getActiveEnvironmentPath(vscode.workspace.workspaceFolders?.[0]?.uri);
+    const resolved = await envs.resolveEnvironment(active);
+    return resolved?.executable.uri?.fsPath ?? active.path;
+}
+
+/**
+ * @brief Python interpreter used to run pcons.
+ * @return Explicit `pcons.pythonPath`, else the Python extension's active interpreter, else `python`.
+ */
+export async function pythonExecutable(): Promise<string> {
+    const configured = vscode.workspace.getConfiguration('pcons').inspect<string>('pythonPath');
+    const explicit = configured?.workspaceFolderValue ?? configured?.workspaceValue ?? configured?.globalValue;
+    if (explicit) {
+        return explicit;
+    }
+    try {
+        return (await activePythonInterpreter()) ?? 'python';
+    } catch {
+        return 'python';
+    }
+}
+
 
 class ProgressBar implements vscode.Disposable {
     private bar;
@@ -257,7 +294,7 @@ export async function channelExec(command: string,
     cwd: string | undefined = undefined,
     onBuildLine?: (line: string) => void,
     lineTransform?: (line: string) => string) {
-    let stream = new Stream('python', ['-u', '-m', 'pcons', command, ...parameters], { cwd: cwd });
+    let stream = new Stream(await pythonExecutable(), ['-u', '-m', 'pcons', command, ...parameters], { cwd: cwd });
     title = title ?? `Executing ${command} ${parameters.join(' ')}`;
     const channel = getOutputChannel();
     channel.clear();
@@ -355,19 +392,4 @@ export async function execInTerminal(
     } else {
         terminal.sendText(commandLine, true);
     }
-}
-
-
-export function termExec(command: string,
-    parameters: string[] = [],
-    title: string | null = null,
-    cancellable: boolean = true,
-    cwd: string | undefined = undefined) {
-    let term = getTerminal();
-    term.show();
-    let args = ['python', '-m', 'pcons', command, ...parameters];
-    if (cwd) {
-        args.unshift('cd', cwd, '&&');
-    }
-    term.sendText(args.join(' '));
 }

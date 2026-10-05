@@ -145,9 +145,10 @@ export class pconsTestAdapter implements TestAdapter {
             ? `^${this.escapeRegex(test.testName)}($|\\.)`
             : `^${this.escapeRegex(test.testName)}$`;
 
-        channel.appendLine(`Running test ${test.id} with command: python -m pcons.test_runner --manifest ${manifestPath} -R ${nameRegex} -j 1`);
+        const python = await run.pythonExecutable();
+        channel.appendLine(`Running test ${test.id} with command: ${python} -m pcons.test_runner --manifest ${manifestPath} -R ${nameRegex} -j 1`);
 
-        let stream = new Stream('python', ['-m', 'pcons.test_runner', '--manifest', manifestPath, '-R', nameRegex, '-j', '1'], {
+        let stream = new run.Stream(python, ['-m', 'pcons.test_runner', '--manifest', manifestPath, '-R', nameRegex, '-j', '1'], {
             cwd: this.ext.projectRoot,
         });
 

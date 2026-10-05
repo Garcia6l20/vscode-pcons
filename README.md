@@ -14,31 +14,34 @@ The extension activates automatically when the workspace contains a pcons-build.
 
 ## Features
 
-- Configure, build, clean, run, debug, and test pcons targets from VS Code commands.
+- Generate, build, clean, run, debug, and test pcons targets from VS Code commands.
+- Test Explorer integration for discovering, running, and debugging tests.
 - Automatic target discovery from generated pcons metadata.
 - Status bar controls for build variant, launch target, build targets, and tests.
 - CodeLens actions on target definitions inside pcons-build.py:
-	- Build
-	- Run
-	- Debug
-	- Optional advanced mode: Run with args, Debug with args
+  - Build
+  - Run
+  - Debug
+  - Optional advanced mode: Run with args, Debug with args
 - Build diagnostics surfaced in VS Code Problems.
 - Target-specific launch arguments persisted in workspace state.
 
 ## Requirements
 
-- pcons installed and available in PATH.
+- pcons installed in the selected Python environment.
 - A pcons project with pcons-build.py at workspace root.
 - Python available in PATH, or configured via pcons.pythonPath.
 - For debugging C/C++ targets:
-	- cpptools extension support (debug adapter integration)
-	- A debugger (gdb/lldb on Linux/macOS, Visual Studio debugger on Windows)
+  - cpptools extension support (debug adapter integration)
+  - A debugger (gdb/lldb on Linux/macOS, Visual Studio debugger on Windows)
+- For debugging pcons Python commands:
+  - A Python debugger extension that provides `type: "python"` launch configurations
 
 ## Commands
 
 Main commands:
 
-- pcons: Configure
+- pcons: Generate
 - pcons: Build
 - pcons: Clean
 - pcons: Run
@@ -82,27 +85,29 @@ When in a pcons workspace:
 The extension contributes the following settings:
 
 - pcons.buildFolder (string, default: build)
-	- Build directory path.
-	- Supports ${workspaceFolder} and ${variant} placeholders.
+  - Build directory path.
+  - Supports ${workspaceFolder} and ${variant} placeholders.
 - pcons.pythonPath (string, default: python)
-	- Python executable setting exposed by the extension.
+  - Python executable setting exposed by the extension.
 - pcons.debuggerPath (string, default: null)
-	- Debugger executable path (for example gdb or lldb-mi).
+  - Debugger executable path (for example gdb or lldb-mi).
 - pcons.jobs (integer)
-	- Maximum parallel jobs for build/test commands.
+  - Maximum parallel jobs for build/test commands.
 - pcons.pythonDebugJustMyCode (boolean, default: true)
-	- Controls JustMyCode when debugging pcons python commands.
+  - Controls JustMyCode when debugging pcons python commands.
 - pcons.variants (array, default: ["debug", "release"])
-	- Variants available for this project. The first one will be used as default.
+  - Variants available for this project. The first one will be used as default.
 - pcons.variables (object, default: {})
-	- Workspace build variables forwarded to generate.
+  - Workspace build variables forwarded to generate.
 
 ## Workflow
 
 1. Open a project containing pcons-build.py.
-   - The extension activates and automatically runs configure to discover targets.
+
+- The extension activates and automatically runs generate to discover targets.
+
 2. Select build/launch/test targets from the status bar if needed.
-3. Build, run, debug, or test from commands, keybindings, or CodeLens.
+2. Build, run, debug, or test from commands, keybindings, CodeLens, or Test Explorer.
 
 ## Development
 
@@ -111,8 +116,3 @@ Useful scripts:
 - npm run compile: type-check, lint, and bundle to dist/extension.js
 - npm run watch: start TypeScript and esbuild watchers
 - npm run test: run extension tests
-
-## Known Limitations
-
-- Test Explorer is not enabled for now, kept here for future work.
-
